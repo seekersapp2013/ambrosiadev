@@ -1,0 +1,8 @@
+POST https://tough-malamute-948.convex.cloud/api/sendEmail
+Content-Type: application/json
+
+{
+  "to": "noreply@ambrosia.africa",
+  "subject": "Test from REST Client",
+  "html": "<p>Hello from VS Code</p>"
+}

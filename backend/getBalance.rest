@@ -1,0 +1,3 @@
+curl -X POST /api/getBalance \
+  -H "Content-Type: application/json" \
+  -d '{"privateKey":"0xcc4e8deaea304b6d2114a96fb1730b8af156c9a299467f207d5e3ff328173d15"}'

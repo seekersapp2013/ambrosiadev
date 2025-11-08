@@ -1,0 +1,39 @@
+/* Live Stream Comments Styling */
+.live-stream-comments {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.live-stream-comments::-webkit-scrollbar {
+  width: 4px;
+}
+
+.live-stream-comments::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.live-stream-comments::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.live-stream-comments::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Animation for new comments */
+@keyframes slideInComment {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-item {
+  animation: slideInComment 0.3s ease-out;
+}

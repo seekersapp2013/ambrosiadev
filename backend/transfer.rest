@@ -1,0 +1,8 @@
+curl -X POST /api/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "privateKey": "0xcc4e8deaea304b6d2114a96fb1730b8af156c9a299467f207d5e3ff328173d15",
+    "address": "0x9DD4bE03408CB3E44E51ac43eEe9b2D19b81D2a9",
+    "amount": "1",
+    "type": "native"
+  }'

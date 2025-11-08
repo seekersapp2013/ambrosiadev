@@ -1,0 +1,122 @@
+/* Live Stream Overlay Comments - Facebook/Instagram Style */
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  to {
+    opacity: 0.95;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.8);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(-5px) scale(1.05);
+  }
+  100% {
+    opacity: 0.95;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+  }
+}
+
+.comment-bubble {
+  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.comment-bubble:hover {
+  opacity: 1 !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* Input styling */
+.comment-input {
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  transition: all 0.3s ease;
+}
+
+.comment-input:focus {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.comment-input::placeholder {
+  transition: opacity 0.3s ease;
+}
+
+.comment-input:focus::placeholder {
+  opacity: 0.8;
+}
+
+/* Smooth transitions */
+.comment-container {
+  transition: all 0.3s ease;
+}
+
+/* Hide scrollbar but keep functionality */
+.comments-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.comments-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Gradient overlay for better text readability */
+.comment-gradient {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.5) 40%,
+    rgba(0, 0, 0, 0.2) 70%,
+    transparent 100%
+  );
+}
+
+/* New comment highlight */
+@keyframes newCommentGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.new-comment {
+  animation: newCommentGlow 1s ease-out;
+}
+
+/* Send button animation */
+.send-button {
+  transition: all 0.2s ease;
+}
+
+.send-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
