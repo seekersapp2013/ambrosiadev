@@ -107,6 +107,7 @@ export function ChatList({ onSelectConversation }: ChatListProps) {
 
       <div className="divide-y divide-gray-100">
         {conversations.map((conversation) => {
+          if (!conversation) return null;
           const otherUser = conversation.otherUser;
 
           return (

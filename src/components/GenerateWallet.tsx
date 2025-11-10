@@ -1,19 +1,57 @@
 import { useState } from "react";
 import axios from "axios";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export function GenerateWallet() {
   const [generatedWallet, setGeneratedWallet] = useState<any | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const myProfile = useQuery(api.profiles.getMyProfile);
+  const updateProfile = useMutation(api.profiles.createOrUpdateProfile);
 
   const handleGenerateWallet = async () => {
     setIsGenerating(true);
     try {
-      const res = await axios.get("/api/createWallet");
+      const res = await axios.get("https://oathstone-api2.azurewebsites.net/createWallet");
       setGeneratedWallet(res.data);
+      
+      // Automatically save to profile if generation was successful
+      if (res.data && res.data.address && res.data.privateKey) {
+        await saveWalletToProfile(res.data);
+      }
     } catch (err) {
       setGeneratedWallet({ error: "Failed to generate wallet" });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const saveWalletToProfile = async (walletData: any) => {
+    if (!myProfile) {
+      alert("Profile not found. Please try again.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        username: myProfile.username || `user_${Date.now()}`,
+        name: myProfile.name || myProfile.user?.name || "User",
+        bio: myProfile.bio ?? undefined,
+        avatar: myProfile.avatar ?? undefined,
+        walletAddress: walletData.address,
+        privateKey: walletData.privateKey,
+        seedPhrase: walletData.mnemonic,
+      });
+      
+      alert("Wallet generated and saved to your profile successfully!");
+    } catch (error) {
+      console.error("Error saving wallet to profile:", error);
+      alert("Wallet generated but failed to save to profile. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 

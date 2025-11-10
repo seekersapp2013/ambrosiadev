@@ -165,7 +165,7 @@ export function EventBookingConfirmation({ eventId, onConfirm, onCancel }: Event
           {/* Payment Section */}
           {showPaywall ? (
             <GatedContentPaywall
-              contentType="event"
+              contentType="booking"
               title={eventData.title}
               price={eventData.pricePerPerson}
               token="USD"

@@ -14,7 +14,7 @@ export default defineConfig({
 
   server: {
     host: true,
-    allowedHosts: ['app.ambrosia.africa', 'localhost'],
+    allowedHosts: ['app.ambrosia.africa', 'dev.ambrosia.africa', 'localhost'],
     proxy: {
       // Forward all /api requests directly to the real backend
       '/api': {

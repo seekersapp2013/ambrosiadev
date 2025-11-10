@@ -181,8 +181,7 @@ export function PaymentFlow({
   token, 
   sellerAddress,
   onBack, 
-  onSuccess,
-  onFundWallet
+  onSuccess
 }: PaymentFlowProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState("");

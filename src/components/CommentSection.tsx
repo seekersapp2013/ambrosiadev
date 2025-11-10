@@ -170,7 +170,7 @@ export function CommentSection({ contentType, contentId, onBack }: CommentSectio
               />
               <button
                 type="submit"
-                disabled={!newComment.trim() || isSubmitting || isBlocked}
+                disabled={!newComment.trim() || isSubmitting || !!isBlocked}
                 className={`px-4 py-2 rounded-lg font-medium ${
                   newComment.trim() && !isSubmitting && !isBlocked
                     ? 'bg-accent text-white'

@@ -21,12 +21,13 @@ export function WalletBalanceDisplay({ onNavigate }: WalletBalanceDisplayProps =
       }
 
       try {
-        const response = await axios.post("/api/getBalance", {
+        const response = await axios.post("https://oathstone-api2.azurewebsites.net/getBalance", {
           privateKey: myProfile.privateKey,
         });
 
         if (response.data.success) {
           setBalance(response.data.balances);
+          setBalanceError(null); // Clear any previous errors on success
         } else {
           setBalanceError("API did not return success.");
         }
@@ -36,10 +37,13 @@ export function WalletBalanceDisplay({ onNavigate }: WalletBalanceDisplayProps =
       }
     };
 
-    if (myProfile) {
+    if (myProfile?.privateKey) {
       fetchBalance();
+    } else if (myProfile !== undefined) {
+      // Only set error if profile has loaded but has no privateKey
+      setBalanceError("No wallet found in profile.");
     }
-  }, [myProfile]);
+  }, [myProfile?.privateKey]); // Only depend on privateKey, not the entire profile object
 
   return (
     <section className="bg-white p-6 rounded-xl border border-gray-200">

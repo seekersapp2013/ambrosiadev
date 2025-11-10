@@ -174,7 +174,7 @@ export function NotificationAnalyticsDashboard({ onBack }: NotificationAnalytics
                 { label: 'Delivered', value: funnelAnalytics.funnel.delivered, rate: funnelAnalytics.conversionRates.deliveryRate },
                 { label: 'Viewed', value: funnelAnalytics.funnel.viewed, rate: funnelAnalytics.conversionRates.viewRate },
                 { label: 'Clicked', value: funnelAnalytics.funnel.clicked, rate: funnelAnalytics.conversionRates.clickRate }
-              ].map((step, index) => (
+              ].map((step) => (
                 <div key={step.label} className="flex items-center space-x-4">
                   <div className="w-20 text-sm text-gray-600">{step.label}</div>
                   <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
@@ -219,19 +219,19 @@ export function NotificationAnalyticsDashboard({ onBack }: NotificationAnalytics
                       <span className="text-gray-600">Delivered:</span>
                       <span className="font-medium">{formatNumber(metrics.delivered)}</span>
                     </div>
-                    {metrics.viewed !== undefined && (
+                    {'viewed' in metrics && metrics.viewed !== undefined && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Viewed:</span>
                         <span className="font-medium">{formatNumber(metrics.viewed)}</span>
                       </div>
                     )}
-                    {metrics.opened !== undefined && (
+                    {'opened' in metrics && metrics.opened !== undefined && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Opened:</span>
                         <span className="font-medium">{formatNumber(metrics.opened)}</span>
                       </div>
                     )}
-                    {metrics.failed !== undefined && metrics.failed > 0 && (
+                    {'failed' in metrics && metrics.failed !== undefined && metrics.failed > 0 && (
                       <div className="flex justify-between">
                         <span className="text-red-600">Failed:</span>
                         <span className="font-medium text-red-600">{formatNumber(metrics.failed)}</span>

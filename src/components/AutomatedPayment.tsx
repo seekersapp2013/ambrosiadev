@@ -46,7 +46,7 @@ export function AutomatedPaymentFlow({
       }
 
       try {
-        const response = await axios.post("/api/getBalance", {
+        const response = await axios.post("https://oathstone-api2.azurewebsites.net/getBalance", {
           privateKey: myProfile.privateKey,
         });
 
@@ -96,7 +96,7 @@ export function AutomatedPaymentFlow({
 
     try {
       // Step 1: Send the blockchain transaction automatically
-      const paymentResponse = await axios.post("/api/sendPayment", {
+      const paymentResponse = await axios.post("https://oathstone-api2.azurewebsites.net/sendPayment", {
         fromPrivateKey: myProfile.privateKey,
         toAddress: sellerAddress,
         amount: price,
@@ -421,7 +421,7 @@ export function AutomatedPaywallDisplay({
       }
 
       try {
-        const response = await axios.post("/api/getBalance", {
+        const response = await axios.post("https://oathstone-api2.azurewebsites.net/getBalance", {
           privateKey: myProfile.privateKey,
         });
 

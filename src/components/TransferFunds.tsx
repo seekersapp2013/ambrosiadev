@@ -25,7 +25,7 @@ export function TransferFunds() {
         return;
       }
 
-      const res = await axios.post("/api/transfer", {
+      const res = await axios.post("https://oathstone-api2.azurewebsites.net/transfer", {
         privateKey: myProfile.privateKey,
         address,
         amount,

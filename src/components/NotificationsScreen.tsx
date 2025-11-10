@@ -238,7 +238,7 @@ export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScr
             {categories.map((category) => (
               <button
                 key={category}
-                onClick={() => setCategoryFilter(category)}
+                onClick={() => setCategoryFilter(category as string)}
                 className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap capitalize ${
                   categoryFilter === category 
                     ? "bg-blue-500 text-white" 
@@ -387,14 +387,9 @@ export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScr
                   </p>
                   
                   {/* Actor and Content Links */}
-                  {(notification.actorName || notification.contentTitle) && (
+                  {notification.actor?.name && (
                     <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                      {notification.actorName && (
-                        <span>by {notification.actorName}</span>
-                      )}
-                      {notification.contentTitle && (
-                        <span className="truncate">"{notification.contentTitle}"</span>
-                      )}
+                      <span>by {notification.actor.name}</span>
                     </div>
                   )}
                   
@@ -415,11 +410,11 @@ export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScr
                       )}
                       
                       {/* Link to content if available */}
-                      {notification.contentId && (
+                      {notification.relatedContentId && (
                         <button
                           onClick={() => {
                             // Navigate to content - this would need to be implemented based on your routing
-                            console.log('Navigate to content:', notification.contentId);
+                            console.log('Navigate to content:', notification.relatedContentId);
                           }}
                           className="text-xs text-blue-500 hover:text-blue-700"
                         >

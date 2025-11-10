@@ -3,7 +3,7 @@
     "celo": {
   "environment": 0,
       "rpcUrl": {
-        "testnet": "https://alfajores-forno.celo-testnet.org",
+        "testnet": "https://forno.celo-sepolia.celo-testnet.org",
         "mainnet": "https://forno.celo.org"
       },
       "tokens": {

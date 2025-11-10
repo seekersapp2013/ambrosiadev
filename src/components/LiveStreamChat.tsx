@@ -18,14 +18,6 @@ export function LiveStreamChat({ streamId, onClose }: LiveStreamChatProps) {
   const comments = useQuery(api.streamComments.getStreamComments, { streamId });
   const commentCount = useQuery(api.streamComments.getStreamCommentCount, { streamId });
 
-  // Get avatar URLs for comments
-  const avatarUrls = useQuery(
-    api.files.getFileUrl,
-    comments && comments.length > 0 && comments[0]?.author?.avatar 
-      ? { storageId: comments[0].author.avatar } 
-      : "skip"
-  );
-
   // Auto-scroll to bottom when new comments arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

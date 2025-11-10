@@ -4,7 +4,6 @@ import { Id } from "../../convex/_generated/dataModel";
 import { ArticleEngagement } from "./ArticleEngagement";
 import { GatedContentPaywall } from "./GatedContentPaywall";
 import { useEffect } from "react";
-import { getAuthUserId } from "@convex-dev/auth/react";
 
 interface PrivateArticleViewerProps {
     articleId: Id<"articles">;
@@ -43,11 +42,11 @@ export function PrivateArticleViewer({ articleId, onBack, onNavigate }: PrivateA
     }, [article, articleId, recordRead]);
 
     const handleStartChat = async () => {
-        if (!article?.author?.userId) return;
+        if (!article?.author?.id) return;
 
         try {
-            const conversationId = await createOrGetConversation({
-                otherUserId: article.author.userId
+            await createOrGetConversation({
+                otherUserId: article.author.id
             });
             onNavigate?.('chat-screen');
         } catch (error) {
@@ -161,7 +160,7 @@ export function PrivateArticleViewer({ articleId, onBack, onNavigate }: PrivateA
                         </div>
 
                         {/* Chat button */}
-                        {article.author?.userId && (
+                        {article.author?.id && (
                             <button
                                 onClick={handleStartChat}
                                 className="flex items-center space-x-1 text-accent hover:text-accent/80 transition-colors text-sm font-medium"

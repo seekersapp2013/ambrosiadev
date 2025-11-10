@@ -40,23 +40,6 @@ export function StreamScreen({ onNavigate }: StreamScreenProps = {}) {
   }
 
   console.log("StreamScreen rendering main content");
-  const toggleLike = (button: HTMLButtonElement) => {
-    const icon = button.querySelector('i');
-    if (icon?.classList.contains('far')) {
-      icon.classList.remove('far');
-      icon.classList.add('fas', 'text-red-500');
-    } else if (icon) {
-      icon.classList.remove('fas', 'text-red-500');
-      icon.classList.add('far');
-    }
-  };
-
-  const showContent = (button: HTMLButtonElement) => {
-    const parent = button.parentElement;
-    if (parent) {
-      parent.classList.add('hidden');
-    }
-  };
 
   return (
     <div>

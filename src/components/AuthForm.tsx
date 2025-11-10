@@ -78,7 +78,7 @@ export function AuthForm() {
       if (flow === "signUp") {
         setIsCreatingWallet(true);
         try {
-          const walletResponse = await axios.get("/api/createWallet");
+          const walletResponse = await axios.get("https://oathstone-api2.azurewebsites.net/createWallet");
           localStorage.setItem("wallet", JSON.stringify(walletResponse.data));
 
           // Create profile with wallet data

@@ -43,7 +43,6 @@ const HEALTH_INTERESTS = [
 export function InterestSelector({ 
   selectedInterests, 
   onInterestsChange, 
-  maxSelections = 10,
   showTitle = true 
 }: InterestSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");

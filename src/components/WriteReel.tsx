@@ -59,7 +59,7 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
         isGated,
         priceToken: isGated ? "USD" : undefined,
         priceAmount: isGated ? priceAmount : undefined,
-        sellerAddress: isGated ? myProfile?.walletAddress : undefined,
+        sellerAddress: isGated && myProfile?.walletAddress ? myProfile.walletAddress : undefined,
         isSensitive,
       });
 

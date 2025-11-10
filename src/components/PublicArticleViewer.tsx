@@ -62,16 +62,16 @@ export function PublicArticleViewer({ slug }: PublicArticleViewerProps) {
         }
     };
 
-    const handleStartChat = async () => {
-        if (!article?.author?.userId || !isAuthenticated) {
+    const _handleStartChat = async () => {
+        if (!article?.author?.id || !isAuthenticated) {
             // Redirect to sign in if not authenticated
             window.location.href = '/';
             return;
         }
 
         try {
-            const conversationId = await createOrGetConversation({
-                otherUserId: article.author.userId
+            await createOrGetConversation({
+                otherUserId: article.author.id
             });
             // Redirect to main app chat screen
             window.location.href = '/';

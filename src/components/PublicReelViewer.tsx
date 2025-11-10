@@ -1,6 +1,5 @@
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { getFullReelUrl } from "../utils/router";
 import { ReelEngagement } from "./ReelEngagement";
 import { GatedContentPaywall } from "./GatedContentPaywall";
 import { useState, useRef, useEffect } from "react";
@@ -10,7 +9,7 @@ interface PublicReelViewerProps {
     authorUsername: string;
 }
 
-export function PublicReelViewer({ reelId, authorUsername }: PublicReelViewerProps) {
+export function PublicReelViewer({ reelId }: PublicReelViewerProps) {
     const { isAuthenticated } = useConvexAuth();
     const [isPlaying, setIsPlaying] = useState(false);
     const [showSensitiveContent, setShowSensitiveContent] = useState(false);

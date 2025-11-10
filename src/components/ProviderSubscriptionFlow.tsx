@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ProviderSubscription } from './ProviderSubscription';
 
 interface ProviderSubscriptionFlowProps {

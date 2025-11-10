@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { EventWithDetails } from '../types/booking';
@@ -8,11 +8,14 @@ interface EventCardProps {
   onSelect?: (eventId: string) => void;
 }
 
-export function EventCard({ event, onSelect }: EventCardProps) {
+export function EventCard({ event: eventWithDetails, onSelect }: EventCardProps) {
+  const event = eventWithDetails.event;
+  const provider = eventWithDetails.provider;
+  
   // Get provider avatar
   const avatarUrl = useQuery(
     api.files.getFileUrl,
-    event.provider.profile?.avatar ? { storageId: event.provider.profile.avatar } : "skip"
+    provider.avatar ? { storageId: provider.avatar } : "skip"
   );
 
   const formatDate = (dateString: string) => {
@@ -42,14 +45,14 @@ export function EventCard({ event, onSelect }: EventCardProps) {
 
   const getStatusColor = () => {
     if (event.status === 'FULL') return 'bg-red-100 text-red-800';
-    if (event.availableSpots <= 2) return 'bg-yellow-100 text-yellow-800';
+    if (eventWithDetails.availableSpots <= 2) return 'bg-yellow-100 text-yellow-800';
     return 'bg-green-100 text-green-800';
   };
 
   const getStatusText = () => {
     if (event.status === 'FULL') return 'Full';
-    if (event.availableSpots <= 2) return `${event.availableSpots} spots left`;
-    return `${event.availableSpots} spots available`;
+    if (eventWithDetails.availableSpots <= 2) return `${eventWithDetails.availableSpots} spots left`;
+    return `${eventWithDetails.availableSpots} spots available`;
   };
 
   return (
@@ -70,11 +73,11 @@ export function EventCard({ event, onSelect }: EventCardProps) {
         <div className="flex items-center space-x-2">
           <img
             src={avatarUrl || "https://randomuser.me/api/portraits/women/44.jpg"}
-            alt={event.provider.profile?.name || event.provider.profile?.username}
+            alt={provider.name || provider.username}
             className="w-6 h-6 rounded-full object-cover"
           />
           <span className="text-sm text-gray-600">
-            {event.provider.profile?.name || event.provider.profile?.username}
+            {provider.name || provider.username}
           </span>
         </div>
       </div>

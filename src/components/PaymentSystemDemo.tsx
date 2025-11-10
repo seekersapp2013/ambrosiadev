@@ -113,7 +113,7 @@ export function PaymentSystemDemo() {
               <div className="bg-white rounded-lg border max-h-96 overflow-y-auto">
                 <PaymentFlow
                   {...demoProps}
-                  contentId="demo-id" as any
+                  contentId={"demo-id" as any}
                   onBack={() => alert('Back clicked!')}
                   onSuccess={() => alert('Payment successful!')}
                 />

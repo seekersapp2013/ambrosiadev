@@ -21,7 +21,6 @@ const PLATFORM_FEE_PERCENTAGE = 0.02; // 2%
 export function GatedContentPaywall({
     contentType = "article",
     contentId,
-    title,
     price,
     token,
     sellerAddress,
@@ -47,7 +46,7 @@ export function GatedContentPaywall({
             }
 
             try {
-                const response = await axios.post("/api/getBalance", {
+                const response = await axios.post("https://oathstone-api2.azurewebsites.net/getBalance", {
                     privateKey: myProfile.privateKey,
                 });
 
@@ -109,7 +108,7 @@ export function GatedContentPaywall({
             const sellerAmount = price - platformFee;
 
             // Send payment to seller
-            const sellerPayment = await axios.post("/api/transfer", {
+            const sellerPayment = await axios.post("https://oathstone-api2.azurewebsites.net/transfer", {
                 privateKey: myProfile.privateKey,
                 address: sellerAddress,
                 amount: sellerAmount.toString(),
@@ -121,7 +120,7 @@ export function GatedContentPaywall({
             }
 
             // Send platform fee
-            const feePayment = await axios.post("/api/transfer", {
+            const feePayment = await axios.post("https://oathstone-api2.azurewebsites.net/transfer", {
                 privateKey: myProfile.privateKey,
                 address: PLATFORM_FEE_ADDRESS,
                 amount: platformFee.toString(),

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
 import { ReelEngagement } from "./ReelEngagement";
 import { GatedContentPaywall } from "./GatedContentPaywall";
 

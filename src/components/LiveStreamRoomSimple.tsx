@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useMutation, useAction } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import {
@@ -7,7 +7,6 @@ import {
     RoomEvent,
     RemoteParticipant,
     LocalParticipant,
-    Track,
     VideoPresets,
 } from 'livekit-client';
 
@@ -36,7 +35,6 @@ export function LiveStreamRoom({
     const [participants, setParticipants] = useState<(RemoteParticipant | LocalParticipant)[]>([]);
     
     const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideosRef = useRef<{ [key: string]: HTMLVideoElement }>({});
 
     const updateStreamStatus = useMutation(api.livekit.updateStreamStatus);
 

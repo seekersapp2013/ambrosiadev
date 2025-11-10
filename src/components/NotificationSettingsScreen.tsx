@@ -12,7 +12,6 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
     const globalPreferences = useQuery(api.notifications.getGlobalNotificationPreferences);
 
     const updateSetting = useMutation(api.notifications.updateNotificationSetting);
-    const updateAllSettings = useMutation(api.notifications.updateAllNotificationSettings);
     const resetSettings = useMutation(api.notifications.resetAllNotificationSettings);
     const updateGlobalPreferences = useMutation(api.notifications.updateGlobalNotificationPreferences);
 
@@ -93,7 +92,7 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
     };
 
     const getSettingForType = (notificationType: string) => {
-        return userSettings?.find(setting => setting.notificationType === notificationType);
+        return userSettings?.find(setting => setting && setting.notificationType === notificationType);
     };
 
     const filteredTypes = activeCategory === 'all'
@@ -147,7 +146,7 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
                                 <label className="text-sm text-gray-600">From:</label>
                                 <input
                                     type="time"
-                                    value={globalPreferences.quietHoursStart || "22:00"}
+                                    value={(globalPreferences.quietHours?.settings as any)?.startTime || "22:00"}
                                     onChange={(e) => handleUpdateGlobalPreference('quietHoursStart', e.target.value)}
                                     className="px-2 py-1 border border-gray-300 rounded text-sm"
                                     disabled={isLoading}
@@ -157,7 +156,7 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
                                 <label className="text-sm text-gray-600">To:</label>
                                 <input
                                     type="time"
-                                    value={globalPreferences.quietHoursEnd || "08:00"}
+                                    value={(globalPreferences.quietHours?.settings as any)?.endTime || "08:00"}
                                     onChange={(e) => handleUpdateGlobalPreference('quietHoursEnd', e.target.value)}
                                     className="px-2 py-1 border border-gray-300 rounded text-sm"
                                     disabled={isLoading}
@@ -172,7 +171,7 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
                         <div className="flex items-center space-x-2">
                             <input
                                 type="checkbox"
-                                checked={globalPreferences.batchingEnabled !== false}
+                                checked={(globalPreferences.batchingPreferences as any)?.immediate !== undefined}
                                 onChange={(e) => handleUpdateGlobalPreference('batchingEnabled', e.target.checked)}
                                 className="rounded border-gray-300"
                                 disabled={isLoading}
@@ -263,9 +262,9 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
                                                 disabled={isLoading}
                                                 className="sr-only"
                                             />
-                                            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${setting?.email !== false ? 'bg-accent' : 'bg-gray-200'
+                                            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${setting?.channels?.email !== false ? 'bg-accent' : 'bg-gray-200'
                                                 } ${isLoading ? 'opacity-50' : ''}`}>
-                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${setting?.email !== false ? 'translate-x-6' : 'translate-x-1'
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${setting?.channels?.email !== false ? 'translate-x-6' : 'translate-x-1'
                                                     }`} />
                                             </div>
                                         </label>

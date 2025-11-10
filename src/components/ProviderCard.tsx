@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { BookingSubscriber } from '../types/booking';
@@ -114,7 +113,7 @@ export function ProviderCard({ subscriber, profile, onClick }: ProviderCardProps
       <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-lg font-bold text-accent">${subscriber.sessionPrice}</span>
+            <span className="text-lg font-bold text-accent">${subscriber.oneOnOnePrice}</span>
             <span className="text-sm text-gray-500 ml-1">/60 min</span>
           </div>
           <button className="px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent/90 transition-colors">

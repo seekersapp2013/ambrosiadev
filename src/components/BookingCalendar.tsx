@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -257,7 +257,7 @@ export function BookingCalendar({ providerId, onTimeSelect, onBack, selectedDate
                         </span>
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        60 minutes • ${availabilityData.provider.sessionPrice}
+                        60 minutes • ${availabilityData?.provider?.oneOnOnePrice || 0}
                       </div>
                     </button>
                   ))

@@ -24,8 +24,8 @@ export interface BookingSubscriber {
   userId: Id<"users">;
   jobTitle: string;
   specialization: string;
-  oneOnOnePrice: number; // Price for 1-on-1 sessions per hour
-  groupSessionPrice: number; // Price for group sessions per person per hour
+  oneOnOnePrice?: number; // Price for 1-on-1 sessions per hour
+  groupSessionPrice?: number; // Price for group sessions per person per hour
   aboutUser: string;
   xLink?: string;
   linkedInLink?: string;

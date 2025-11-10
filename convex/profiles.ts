@@ -62,18 +62,24 @@ export const createOrUpdateProfile = mutation({
       if (userProfile) {
         // Update existing profile
         console.log('Updating existing profile:', userProfile._id);
-        await ctx.db.patch(userProfile._id, {
+        
+        // Build update object with only provided fields
+        const updateData: any = {
           username: args.username.toLowerCase(),
-          name: args.name,
-          bio: args.bio,
-          avatar: args.avatar,
-          phoneNumber: args.phoneNumber,
-          walletAddress: args.walletAddress,
-          privateKey: args.privateKey,
-          seedPhrase: args.seedPhrase,
-          interests: args.interests,
           updatedAt: Date.now(),
-        });
+        };
+        
+        // Only update fields that are explicitly provided
+        if (args.name !== undefined) updateData.name = args.name;
+        if (args.bio !== undefined) updateData.bio = args.bio;
+        if (args.avatar !== undefined) updateData.avatar = args.avatar;
+        if (args.phoneNumber !== undefined) updateData.phoneNumber = args.phoneNumber;
+        if (args.walletAddress !== undefined) updateData.walletAddress = args.walletAddress;
+        if (args.privateKey !== undefined) updateData.privateKey = args.privateKey;
+        if (args.seedPhrase !== undefined) updateData.seedPhrase = args.seedPhrase;
+        if (args.interests !== undefined) updateData.interests = args.interests;
+        
+        await ctx.db.patch(userProfile._id, updateData);
         console.log('Profile updated successfully');
         return userProfile._id;
       } else {
@@ -225,6 +231,9 @@ export const getMyProfile = query({
         name: user?.name,
         bio: null,
         avatar: null,
+        walletAddress: null,
+        privateKey: null,
+        seedPhrase: null,
         stats: {
           articles: 0,
           reels: 0,
