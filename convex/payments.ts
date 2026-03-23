@@ -4,47 +4,49 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
 import { api, internal } from "./_generated/api";
 
-// Purchase content (token-gated)
+// Purchase content using internal wallet transfer
 export const purchaseContent = mutation({
   args: {
     contentType: v.string(), // 'article' | 'reel'
     contentId: v.union(v.id("articles"), v.id("reels")),
     priceToken: v.string(),
     priceAmount: v.number(),
-    txHash: v.string(), // Transaction hash from blockchain
-    network: v.string(), // e.g., 'celo'
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     // Verify the content exists and is gated
+    let content: any = null;
+    let contentAuthorId: Id<"users"> | undefined;
+
     if (args.contentType === 'article') {
-      const content = await ctx.db
+      content = await ctx.db
         .query("articles")
         .filter((q) => q.eq(q.field("_id"), args.contentId))
         .first();
-      if (!content || !content.isGated) {
-        throw new Error("Content not found or not gated");
-      }
-      // Verify payment amount matches content price
-      if (content.priceToken !== args.priceToken || content.priceAmount !== args.priceAmount) {
-        throw new Error("Payment amount mismatch");
-      }
+      contentAuthorId = content?.authorId;
     } else if (args.contentType === 'reel') {
-      const content = await ctx.db
+      content = await ctx.db
         .query("reels")
         .filter((q) => q.eq(q.field("_id"), args.contentId))
         .first();
-      if (!content || !content.isGated) {
-        throw new Error("Content not found or not gated");
-      }
-      // Verify payment amount matches content price
-      if (content.priceToken !== args.priceToken || content.priceAmount !== args.priceAmount) {
-        throw new Error("Payment amount mismatch");
-      }
+      contentAuthorId = content?.authorId;
     } else {
       throw new Error("Invalid content type");
+    }
+
+    if (!content || !content.isGated) {
+      throw new Error("Content not found or not gated");
+    }
+
+    // Verify payment amount matches content price
+    if (content.priceToken !== args.priceToken || content.priceAmount !== args.priceAmount) {
+      throw new Error("Payment amount mismatch");
+    }
+
+    if (!contentAuthorId) {
+      throw new Error("Content author not found");
     }
 
     // Check if already purchased
@@ -60,48 +62,136 @@ export const purchaseContent = mutation({
       throw new Error("Content already purchased");
     }
 
-    // Record the payment
+    // Check if user is trying to buy their own content
+    if (contentAuthorId === userId) {
+      throw new Error("Cannot purchase your own content");
+    }
+
+    // Get buyer's wallet
+    const buyerWallet = await ctx.db
+      .query("wallets")
+      .withIndex("userId", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!buyerWallet) {
+      throw new Error("Buyer wallet not found");
+    }
+
+    // For now, we'll use USD for content purchases
+    const currency = "USD";
+    const buyerBalance = buyerWallet.balanceUSD;
+
+    if (buyerBalance < args.priceAmount) {
+      throw new Error("Insufficient balance");
+    }
+
+    // Calculate platform fee (2%)
+    const platformFee = args.priceAmount * 0.02;
+    const sellerAmount = args.priceAmount - platformFee;
+
+    // Get or create seller wallet
+    let sellerWallet = await ctx.db
+      .query("wallets")
+      .withIndex("userId", (q) => q.eq("userId", contentAuthorId))
+      .first();
+
+    if (!sellerWallet) {
+      const walletId = await ctx.db.insert("wallets", {
+        userId: contentAuthorId,
+        balanceUSD: 0,
+        balanceNGN: 0,
+        createdAt: Date.now(),
+      });
+      sellerWallet = await ctx.db.get(walletId);
+      if (!sellerWallet) {
+        throw new Error("Failed to create seller wallet");
+      }
+    }
+
+    // Generate unique transaction ID
+    const transactionId = `cnt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create transaction record for content purchase
+    await ctx.db.insert("transactions", {
+      id: transactionId,
+      fromUserId: userId,
+      toUserId: contentAuthorId,
+      amount: sellerAmount,
+      currency: currency,
+      type: "transfer",
+      status: "completed",
+      description: `Purchase of ${args.contentType}: ${content.title || content.caption || 'Untitled'}`,
+      metadata: {
+        contentType: args.contentType,
+        contentId: args.contentId,
+        platformFee,
+        originalAmount: args.priceAmount,
+      },
+      createdAt: Date.now(),
+      completedAt: Date.now(),
+    });
+
+    // Create platform fee transaction if applicable
+    if (platformFee > 0) {
+      const feeTransactionId = `fee_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await ctx.db.insert("transactions", {
+        id: feeTransactionId,
+        fromUserId: userId,
+        amount: platformFee,
+        currency: currency,
+        type: "transfer",
+        status: "completed",
+        description: `Platform fee for ${args.contentType} purchase`,
+        metadata: {
+          contentType: args.contentType,
+          contentId: args.contentId,
+          relatedTransactionId: transactionId,
+        },
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+      });
+    }
+
+    // Update buyer balance
+    await ctx.db.patch(buyerWallet._id, {
+      balanceUSD: buyerWallet.balanceUSD - args.priceAmount,
+      updatedAt: Date.now(),
+    });
+
+    // Update seller balance
+    if (!sellerWallet) {
+      throw new Error("Seller wallet not found");
+    }
+    await ctx.db.patch(sellerWallet._id, {
+      balanceUSD: sellerWallet.balanceUSD + sellerAmount,
+      updatedAt: Date.now(),
+    });
+
+    // Record the payment for access control
     const paymentId = await ctx.db.insert("payments", {
       payerId: userId,
       contentType: args.contentType,
       contentId: args.contentId,
       token: args.priceToken,
       amount: args.priceAmount,
-      network: args.network,
-      txHash: args.txHash,
+      transactionId,
       createdAt: Date.now(),
     });
 
-    // Trigger high-priority notification for content creator
-    let contentAuthorId: Id<"users"> | undefined;
-    if (args.contentType === 'article') {
-      const article = await ctx.db
-        .query("articles")
-        .filter((q) => q.eq(q.field("_id"), args.contentId))
-        .first();
-      contentAuthorId = article?.authorId;
-    } else if (args.contentType === 'reel') {
-      const reel = await ctx.db
-        .query("reels")
-        .filter((q) => q.eq(q.field("_id"), args.contentId))
-        .first();
-      contentAuthorId = reel?.authorId;
-    }
-
-    if (contentAuthorId && contentAuthorId !== userId) {
-      await ctx.runMutation(internal.notifications.createNotificationEvent, {
-        type: 'CONTENT_PAYMENT',
-        recipientUserId: contentAuthorId,
-        actorUserId: userId,
-        relatedContentType: args.contentType,
-        relatedContentId: args.contentId,
-        metadata: {
-          amount: args.priceAmount.toString(),
-          token: args.priceToken,
-          txHash: args.txHash,
-        },
-      });
-    }
+    // Send notifications
+    await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {
+      type: 'CONTENT_PAYMENT',
+      recipientUserId: contentAuthorId,
+      actorUserId: userId,
+      relatedContentType: args.contentType,
+      relatedContentId: args.contentId,
+      metadata: {
+        amount: sellerAmount.toString(),
+        token: args.priceToken,
+        transactionId,
+        platformFee: platformFee.toString(),
+      },
+    });
 
     return paymentId;
   },
@@ -118,6 +208,7 @@ export const hasAccess = query({
       const userId = await getAuthUserId(ctx);
       if (!userId) {
         return false;
+
       }
 
       // Check if user is the creator

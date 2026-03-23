@@ -53,26 +53,6 @@ export function PaymentConfig({
           <p className="text-xs text-gray-500">
             {contentType === "article" ? "Readers" : "Viewers"} will pay this amount to access your {contentType}
           </p>
-          
-          {/* Payment Address Display */}
-          {myProfile?.walletAddress && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <p className="text-xs text-gray-600 mb-1">Payments will be sent to:</p>
-              <div className="flex items-center justify-between">
-                <code className="text-xs font-mono text-gray-800 break-all">
-                  {myProfile.walletAddress}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(myProfile.walletAddress!)}
-                  className="ml-2 text-accent hover:text-accent-dark text-xs"
-                  title="Copy address"
-                >
-                  <i className="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

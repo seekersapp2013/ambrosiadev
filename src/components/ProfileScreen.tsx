@@ -1,12 +1,85 @@
 import { useState, useEffect, useRef } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { InterestManagement } from "./InterestManagement";
 import { ComprehensiveInterests } from "./ComprehensiveInterests";
 
+// PWA Install Hook
+function usePWAInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(true);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true) {
+      setShowInstallButton(false);
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setShowInstallButton(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const installPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallButton(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+
+      if (isIOS || isSafari) {
+        alert(`To install this app on your ${isIOS ? 'iPhone/iPad' : 'device'}:
+
+1. Tap the Share button (□↗) at the bottom of the screen
+2. Scroll down and tap "Add to Home Screen"
+3. Tap "Add" to confirm
+
+The app will then appear on your home screen!`);
+      } else if (isAndroid) {
+        alert(`To install this app:
+
+1. Tap the menu button (⋮) in your browser
+2. Look for "Add to Home screen" or "Install app"
+3. Tap it and follow the prompts`);
+      } else {
+        alert(`To install this app:
+
+1. Look for an install icon (⬇) in your browser's address bar
+2. Or check your browser's menu for "Install" option
+3. Click it to install the app`);
+      }
+    }
+  };
+
+  return { showInstallButton, installPWA };
+}
+
 export function ProfileScreen() {
   const { isAuthenticated } = useConvexAuth();
+  const { signOut } = useAuthActions();
+  const { showInstallButton, installPWA } = usePWAInstall();
   const bookmarks = useQuery(api.engagement.getUserBookmarks);
   const myProfile = useQuery(api.profiles.getMyProfile);
   const myArticles = useQuery(api.profiles.getMyArticles);
@@ -510,6 +583,38 @@ export function ProfileScreen() {
             )}
           </div>
         )}
+
+        {/* Settings Section */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <h3 className="text-lg font-semibold mb-4">Settings</h3>
+          <div className="space-y-3">
+            {/* Install App Button */}
+            {showInstallButton && (
+              <button
+                onClick={installPWA}
+                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center">
+                  <i className="fas fa-download text-accent mr-3"></i>
+                  <span className="font-medium">Install App</span>
+                </div>
+                <i className="fas fa-chevron-right text-gray-400"></i>
+              </button>
+            )}
+            
+            {/* Sign Out Button */}
+            <button
+              onClick={() => void signOut()}
+              className="w-full flex items-center justify-between p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-red-600"
+            >
+              <div className="flex items-center">
+                <i className="fas fa-sign-out-alt mr-3"></i>
+                <span className="font-medium">Sign Out</span>
+              </div>
+              <i className="fas fa-chevron-right text-red-400"></i>
+            </button>
+          </div>
+        </div>
 
       </div>
 

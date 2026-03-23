@@ -1,41 +1,58 @@
-import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
-// Fix articles with plain text content by converting to HTML
-export const fixPlainTextArticles = mutation({
-  handler: async (ctx) => {
-    const articles = await ctx.db
-      .query("articles")
-      .filter((q) => q.eq(q.field("status"), "PUBLISHED"))
-      .collect();
+// Migration to remove sellerAddress from articles and reels, and wallet fields from profiles
+export const removeSellerAddressFields = mutation({
+  handler: async (ctx): Promise<{
+    success: boolean;
+    articlesUpdated?: number;
+    articlesTotal?: number;
+    reelsUpdated?: number;
+    reelsTotal?: number;
+    profilesUpdated?: number;
+    profilesTotal?: number;
+    totalUpdated?: number;
+    error?: string;
+    message: string;
+  }> => {
+    console.log("🚀 Starting migration to remove deprecated fields...");
 
-    let fixedCount = 0;
+    try {
+      // Remove sellerAddress from articles
+      console.log("📄 Processing articles...");
+      const articleResult: { updated: number; total: number } = await ctx.runMutation(internal.migrations.removeSellerAddress.removeSellerAddressFromArticles);
+      console.log(`✅ Articles: ${articleResult.updated}/${articleResult.total} updated`);
 
-    for (const article of articles) {
-      // Check if content is plain text (doesn't start with HTML tags)
-      if (article.contentHtml && 
-          typeof article.contentHtml === 'string' && 
-          !article.contentHtml.trim().startsWith('<')) {
-        
-        console.log(`Fixing article: ${article.title}`);
-        
-        // Convert plain text to HTML
-        const contentHtml = article.contentHtml.trim()
-          .split('\n\n')
-          .map(paragraph => paragraph.trim())
-          .filter(paragraph => paragraph.length > 0)
-          .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
-          .join('');
+      // Remove sellerAddress from reels
+      console.log("🎬 Processing reels...");
+      const reelResult: { updated: number; total: number } = await ctx.runMutation(internal.migrations.removeSellerAddress.removeSellerAddressFromReels);
+      console.log(`✅ Reels: ${reelResult.updated}/${reelResult.total} updated`);
 
-        await ctx.db.patch(article._id, {
-          contentHtml: contentHtml,
-          updatedAt: Date.now(),
-        });
+      // Remove wallet fields from profiles
+      console.log("👤 Processing profiles...");
+      const profileResult: { updated: number; total: number } = await ctx.runMutation(internal.migrations.removeSellerAddress.removeWalletFieldsFromProfiles);
+      console.log(`✅ Profiles: ${profileResult.updated}/${profileResult.total} updated`);
 
-        fixedCount++;
-      }
+      console.log("🎉 Migration completed successfully!");
+      
+      return {
+        success: true,
+        articlesUpdated: articleResult.updated,
+        articlesTotal: articleResult.total,
+        reelsUpdated: reelResult.updated,
+        reelsTotal: reelResult.total,
+        profilesUpdated: profileResult.updated,
+        profilesTotal: profileResult.total,
+        totalUpdated: articleResult.updated + reelResult.updated + profileResult.updated,
+        message: "Migration completed successfully"
+      };
+    } catch (error) {
+      console.error("❌ Migration failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        message: "Migration failed"
+      };
     }
-
-    return { message: `Fixed ${fixedCount} articles with plain text content` };
   },
 });

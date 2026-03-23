@@ -15,7 +15,6 @@ export const createReel = mutation({
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
     priceAmount: v.optional(v.number()),
-    sellerAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -32,7 +31,6 @@ export const createReel = mutation({
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
-      sellerAddress: args.sellerAddress,
       views: 0,
       createdAt: Date.now(),
     });
@@ -167,7 +165,6 @@ export const setGating = mutation({
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
     priceAmount: v.optional(v.number()),
-    sellerAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -181,7 +178,6 @@ export const setGating = mutation({
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
-      sellerAddress: args.sellerAddress,
     });
 
     return args.reelId;
@@ -296,52 +292,3 @@ export const deleteReel = mutation({
   }
 });
 
-// Migration function to add seller addresses to existing gated reels
-export const addSellerAddressesToGatedReels = mutation({
-  handler: async (ctx) => {
-    console.log('Starting migration to add seller addresses to gated reels...');
-
-    // Get all gated reels without seller addresses
-    const gatedReels = await ctx.db
-      .query("reels")
-      .filter((q) => q.eq(q.field("isGated"), true))
-      .collect();
-
-    console.log(`Found ${gatedReels.length} gated reels`);
-
-    let updated = 0;
-    let skipped = 0;
-
-    for (const reel of gatedReels) {
-      // Skip if already has seller address
-      if (reel.sellerAddress) {
-        skipped++;
-        continue;
-      }
-
-      // Get author's profile to find wallet address
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_userId", (q) => q.eq("userId", reel.authorId))
-        .first();
-
-      if (profile?.walletAddress) {
-        try {
-          await ctx.db.patch(reel._id, {
-            sellerAddress: profile.walletAddress,
-          });
-          updated++;
-          console.log(`Updated reel ${reel._id} with seller address`);
-        } catch (error) {
-          console.error(`Error updating reel ${reel._id}:`, error);
-        }
-      } else {
-        console.log(`No wallet address found for author of reel ${reel._id}`);
-        skipped++;
-      }
-    }
-
-    console.log(`Migration complete: ${updated} reels updated, ${skipped} skipped`);
-    return { updated, skipped, total: gatedReels.length };
-  },
-});

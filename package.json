@@ -19,6 +19,7 @@
     "@xyflow/react": "^12.8.3",
     "axios": "^1.11.0",
     "convex": "^1.23.0",
+    "convex-helpers": "^0.1.114",
     "cors": "^2.8.5",
     "ethers": "^6.15.0",
     "livekit-client": "^2.15.10",

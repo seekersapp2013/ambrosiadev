@@ -69,9 +69,23 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             name: userName,
             createdAt: Date.now(),
           });
-          console.log('Profile created successfully for new user:', { userId, profileId, username: finalUsername });
+
+          // Create wallet for new user
+          const walletId = await ctx.db.insert("wallets", {
+            userId,
+            balanceUSD: 0,
+            balanceNGN: 0,
+            createdAt: Date.now(),
+          });
+
+          console.log('Profile and wallet created successfully for new user:', { 
+            userId, 
+            profileId, 
+            walletId,
+            username: finalUsername 
+          });
         } catch (error) {
-          console.error('Error creating profile for new user:', error);
+          console.error('Error creating profile and wallet for new user:', error);
         }
       }
     },

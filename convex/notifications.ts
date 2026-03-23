@@ -78,6 +78,42 @@ export const NOTIFICATION_TYPES: Record<string, NotificationType> = {
     batchable: false,
     defaultChannels: ['in_app', 'email']
   },
+  WALLET_DEPOSIT: {
+    id: 'WALLET_DEPOSIT',
+    name: 'Wallet Deposit',
+    description: 'Funds were deposited to your wallet',
+    category: 'system',
+    priority: 'medium',
+    batchable: false,
+    defaultChannels: ['in_app']
+  },
+  WALLET_WITHDRAWAL: {
+    id: 'WALLET_WITHDRAWAL',
+    name: 'Wallet Withdrawal',
+    description: 'Funds were withdrawn from your wallet',
+    category: 'system',
+    priority: 'medium',
+    batchable: false,
+    defaultChannels: ['in_app']
+  },
+  WALLET_TRANSFER_SENT: {
+    id: 'WALLET_TRANSFER_SENT',
+    name: 'Transfer Sent',
+    description: 'You sent funds to another user',
+    category: 'system',
+    priority: 'medium',
+    batchable: false,
+    defaultChannels: ['in_app']
+  },
+  WALLET_TRANSFER_RECEIVED: {
+    id: 'WALLET_TRANSFER_RECEIVED',
+    name: 'Transfer Received',
+    description: 'You received funds from another user',
+    category: 'system',
+    priority: 'medium',
+    batchable: false,
+    defaultChannels: ['in_app']
+  },
   USER_MENTIONED: {
     id: 'USER_MENTIONED',
     name: 'User Mentioned',
@@ -285,6 +321,40 @@ async function generateNotificationContent(
         message: `${actorName} mentioned you in a ${relatedContentType}`
       };
 
+    case 'WALLET_DEPOSIT':
+      const depositAmount = metadata?.amount || '0';
+      const depositCurrency = metadata?.currency || 'USD';
+      return {
+        title: 'Wallet Deposit',
+        message: `${depositCurrency === 'NGN' ? '₦' : '$'}${depositAmount} has been deposited to your wallet`
+      };
+
+    case 'WALLET_WITHDRAWAL':
+      const withdrawAmount = metadata?.amount || '0';
+      const withdrawCurrency = metadata?.currency || 'USD';
+      return {
+        title: 'Wallet Withdrawal',
+        message: `${withdrawCurrency === 'NGN' ? '₦' : '$'}${withdrawAmount} has been withdrawn from your wallet`
+      };
+
+    case 'WALLET_TRANSFER_SENT':
+      const sentAmount = metadata?.amount || '0';
+      const sentCurrency = metadata?.currency || 'USD';
+      const recipientUsername = metadata?.recipientUsername || 'user';
+      return {
+        title: 'Transfer Sent',
+        message: `You sent ${sentCurrency === 'NGN' ? '₦' : '$'}${sentAmount} to @${recipientUsername}`
+      };
+
+    case 'WALLET_TRANSFER_RECEIVED':
+      const receivedAmount = metadata?.amount || '0';
+      const receivedCurrency = metadata?.currency || 'USD';
+      const senderUsername = metadata?.senderUsername || 'user';
+      return {
+        title: 'Transfer Received',
+        message: `You received ${receivedCurrency === 'NGN' ? '₦' : '$'}${receivedAmount} from @${senderUsername}`
+      };
+
     case 'FOLLOWER_NEW_POST':
       const newContent = await getContentTitle(ctx, relatedContentType, relatedContentId);
       return {
@@ -361,6 +431,36 @@ async function generateNotificationEmailContent(
     case 'COMMENT_REPLY':
       subject = `${actorName} replied to your comment`;
       message = `${actorName} replied to your comment. See what they had to say!`;
+      break;
+
+    case 'WALLET_DEPOSIT':
+      const depositAmount = metadata?.amount || '0';
+      const depositCurrency = metadata?.currency || 'USD';
+      subject = `Wallet Deposit Confirmation`;
+      message = `${depositCurrency === 'NGN' ? '₦' : '$'}${depositAmount} has been successfully deposited to your Ambrosia wallet.`;
+      break;
+
+    case 'WALLET_WITHDRAWAL':
+      const withdrawAmount = metadata?.amount || '0';
+      const withdrawCurrency = metadata?.currency || 'USD';
+      subject = `Wallet Withdrawal Confirmation`;
+      message = `${withdrawCurrency === 'NGN' ? '₦' : '$'}${withdrawAmount} has been successfully withdrawn from your Ambrosia wallet.`;
+      break;
+
+    case 'WALLET_TRANSFER_SENT':
+      const sentAmount = metadata?.amount || '0';
+      const sentCurrency = metadata?.currency || 'USD';
+      const recipientUsername = metadata?.recipientUsername || 'user';
+      subject = `Transfer Sent Confirmation`;
+      message = `You successfully sent ${sentCurrency === 'NGN' ? '₦' : '$'}${sentAmount} to @${recipientUsername}.`;
+      break;
+
+    case 'WALLET_TRANSFER_RECEIVED':
+      const receivedAmount = metadata?.amount || '0';
+      const receivedCurrency = metadata?.currency || 'USD';
+      const senderUsername = metadata?.senderUsername || 'user';
+      subject = `You Received Funds`;
+      message = `You received ${receivedCurrency === 'NGN' ? '₦' : '$'}${receivedAmount} from @${senderUsername} in your Ambrosia wallet.`;
       break;
 
     case 'CONTENT_PAYMENT':
@@ -544,6 +644,31 @@ export const getUnreadCount = query({
       .collect();
 
     return unreadNotifications.length;
+  },
+});
+
+export const getRecentUnreadNotifications = query({
+  args: {
+    limit: v.optional(v.number())
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const notifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread", (q) => q.eq("userId", userId).eq("isRead", false))
+      .order("desc")
+      .take(args.limit || 5);
+
+    // Return minimal data for performance
+    return notifications.map(notification => ({
+      _id: notification._id,
+      title: notification.title,
+      type: notification.type,
+      createdAt: notification.createdAt,
+      priority: notification.priority || 'medium'
+    }));
   },
 });
 

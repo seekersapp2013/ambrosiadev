@@ -65,7 +65,7 @@ export function InterestSelector({
     <div className="w-full">
       {showTitle && (
         <div className="mb-4">
-          <h3 className="text-lg font-semibold mb-2">Health Interests</h3>
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Health Interests</h3>
           <p className="text-sm text-gray-600">
             Select health topics you're interested in
           </p>
@@ -74,13 +74,18 @@ export function InterestSelector({
 
       {/* Search */}
       <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search health topics..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+            <i className="fas fa-search glass-input-icon"></i>
+          </div>
+          <input
+            type="text"
+            placeholder="Search health topics..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="glass-input w-full pl-10 pr-4 py-3 rounded-xl text-gray-900 placeholder-gray-600 relative z-0"
+          />
+        </div>
       </div>
 
       {/* Selected count */}
@@ -89,7 +94,7 @@ export function InterestSelector({
       </div>
 
       {/* Interest chips */}
-      <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
+      <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
         {filteredInterests.map((interest) => {
           const isSelected = selectedInterests.includes(interest);
           
@@ -98,10 +103,10 @@ export function InterestSelector({
               key={interest}
               type="button"
               onClick={() => toggleInterest(interest)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
                 isSelected
-                  ? "bg-accent text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-white/40 text-gray-800 border border-white/60 backdrop-blur-sm shadow-sm"
+                  : "bg-white/20 text-gray-700 hover:bg-white/30 border border-white/30 backdrop-blur-sm"
               }`}
             >
               {interest}

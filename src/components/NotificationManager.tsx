@@ -4,9 +4,10 @@ import { NotificationSettingsScreen } from "./NotificationSettingsScreen";
 
 interface NotificationManagerProps {
   onBack: () => void;
+  highlightNotificationId?: string;
 }
 
-export function NotificationManager({ onBack }: NotificationManagerProps) {
+export function NotificationManager({ onBack, highlightNotificationId }: NotificationManagerProps) {
   const [currentView, setCurrentView] = useState<"notifications" | "settings">("notifications");
 
   const handleBack = () => {
@@ -29,6 +30,7 @@ export function NotificationManager({ onBack }: NotificationManagerProps) {
     <NotificationsScreen 
       onBack={handleBack} 
       onOpenSettings={handleOpenSettings}
+      highlightNotificationId={highlightNotificationId}
     />
   );
 }

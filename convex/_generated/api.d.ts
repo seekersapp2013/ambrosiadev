@@ -23,6 +23,7 @@ import type * as emailTemplates from "../emailTemplates.js";
 import type * as emails from "../emails.js";
 import type * as engagement from "../engagement.js";
 import type * as events from "../events.js";
+import type * as feed from "../feed.js";
 import type * as files from "../files.js";
 import type * as follows from "../follows.js";
 import type * as http from "../http.js";
@@ -31,6 +32,7 @@ import type * as liveStream from "../liveStream.js";
 import type * as livekit from "../livekit.js";
 import type * as livekitActions from "../livekitActions.js";
 import type * as migrations from "../migrations.js";
+import type * as migrations_removeSellerAddress from "../migrations/removeSellerAddress.js";
 import type * as notificationAnalytics from "../notificationAnalytics.js";
 import type * as notifications from "../notifications.js";
 import type * as payments from "../payments.js";
@@ -43,9 +45,13 @@ import type * as testArticles from "../testArticles.js";
 import type * as testData from "../testData.js";
 import type * as testMigration from "../testMigration.js";
 import type * as userInterests from "../userInterests.js";
+import type * as wallets_createWallet from "../wallets/createWallet.js";
+import type * as wallets_depositFunds from "../wallets/depositFunds.js";
 import type * as wallets_getMyWallet from "../wallets/getMyWallet.js";
-import type * as wallets_saveMyWallet from "../wallets/saveMyWallet.js";
-import type * as wallets_saveWallet from "../wallets/saveWallet.js";
+import type * as wallets_getTransactionHistory from "../wallets/getTransactionHistory.js";
+import type * as wallets_getWalletBalance from "../wallets/getWalletBalance.js";
+import type * as wallets_transferFunds from "../wallets/transferFunds.js";
+import type * as wallets_withdrawFunds from "../wallets/withdrawFunds.js";
 
 import type {
   ApiFromModules,
@@ -53,14 +59,6 @@ import type {
   FunctionReference,
 } from "convex/server";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 declare const fullApi: ApiFromModules<{
   articles: typeof articles;
   auth: typeof auth;
@@ -77,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   emails: typeof emails;
   engagement: typeof engagement;
   events: typeof events;
+  feed: typeof feed;
   files: typeof files;
   follows: typeof follows;
   http: typeof http;
@@ -85,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   livekit: typeof livekit;
   livekitActions: typeof livekitActions;
   migrations: typeof migrations;
+  "migrations/removeSellerAddress": typeof migrations_removeSellerAddress;
   notificationAnalytics: typeof notificationAnalytics;
   notifications: typeof notifications;
   payments: typeof payments;
@@ -97,18 +97,38 @@ declare const fullApi: ApiFromModules<{
   testData: typeof testData;
   testMigration: typeof testMigration;
   userInterests: typeof userInterests;
+  "wallets/createWallet": typeof wallets_createWallet;
+  "wallets/depositFunds": typeof wallets_depositFunds;
   "wallets/getMyWallet": typeof wallets_getMyWallet;
-  "wallets/saveMyWallet": typeof wallets_saveMyWallet;
-  "wallets/saveWallet": typeof wallets_saveWallet;
+  "wallets/getTransactionHistory": typeof wallets_getTransactionHistory;
+  "wallets/getWalletBalance": typeof wallets_getWalletBalance;
+  "wallets/transferFunds": typeof wallets_transferFunds;
+  "wallets/withdrawFunds": typeof wallets_withdrawFunds;
 }>;
-declare const fullApiWithMounts: typeof fullApi;
 
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "internal">
 >;
 

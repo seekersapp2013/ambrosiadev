@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "pencil": {
+      "command": "node",
+      "args": [
+        "node_modules/@kiroai/pencil-mcp/dist/index.js"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

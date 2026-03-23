@@ -1,13 +1,14 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface NotificationsScreenProps {
   onBack: () => void;
   onOpenSettings?: () => void;
+  highlightNotificationId?: string;
 }
 
-export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScreenProps) {
+export function NotificationsScreen({ onBack, onOpenSettings, highlightNotificationId }: NotificationsScreenProps) {
   const notifications = useQuery(api.notifications.getMyNotifications, { limit: 50 });
   const markAsRead = useMutation(api.notifications.markAsRead);
   const markAllAsRead = useMutation(api.notifications.markAllAsRead);
@@ -16,6 +17,19 @@ export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScr
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
+  const highlightedNotificationRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to highlighted notification
+  useEffect(() => {
+    if (highlightNotificationId && highlightedNotificationRef.current) {
+      setTimeout(() => {
+        highlightedNotificationRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 100);
+    }
+  }, [highlightNotificationId, notifications]);
 
   const filteredNotifications = notifications?.filter(notification => {
     // Filter by read status
@@ -323,11 +337,14 @@ export function NotificationsScreen({ onBack, onOpenSettings }: NotificationsScr
           {filteredNotifications.map((notification) => (
             <div
               key={notification._id}
+              ref={highlightNotificationId === notification._id ? highlightedNotificationRef : null}
               className={`p-4 rounded-lg border transition-colors ${
                 notification.isRead 
                   ? "bg-white border-gray-200" 
                   : "bg-ambrosia-50 border-accent"
-              } ${selectedNotifications.has(notification._id) ? "ring-2 ring-blue-500" : ""}`}
+              } ${selectedNotifications.has(notification._id) ? "ring-2 ring-blue-500" : ""} ${
+                highlightNotificationId === notification._id ? "ring-2 ring-yellow-400 bg-yellow-50" : ""
+              }`}
             >
               <div className="flex items-start space-x-3">
                 {/* Selection Checkbox */}

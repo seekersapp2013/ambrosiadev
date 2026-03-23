@@ -15,17 +15,36 @@ export default defineSchema({
     .index("emailId", ["emailId"])
     .index("notificationId", ["notificationId"]),
 
-  // ✅ Existing wallet table
+  // ✅ Refactored wallet table for record-based system
   wallets: defineTable({
     userId: v.id("users"),      // Link to authenticated user
-    address: v.string(),
-    publicKey: v.string(),
-    privateKey: v.string(),     // You may want to encrypt this in the future
-    mnemonic: v.string(),       // Recovery phrase
+    balanceUSD: v.number(),     // USD balance
+    balanceNGN: v.number(),     // NGN balance
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   }).index("userId", ["userId"]),
 
-  // ✅ Extended user profiles
+  // ✅ Transactions table for wallet operations
+  transactions: defineTable({
+    id: v.string(),             // Unique transaction ID
+    fromUserId: v.optional(v.id("users")), // null for deposits
+    toUserId: v.optional(v.id("users")),   // null for withdrawals
+    amount: v.number(),
+    currency: v.string(),       // "USD" or "NGN"
+    type: v.string(),           // "deposit" | "withdrawal" | "transfer"
+    status: v.string(),         // "pending" | "completed" | "failed"
+    description: v.string(),
+    metadata: v.optional(v.any()), // Additional data like recipient username
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  }).index("by_from_user", ["fromUserId"])
+    .index("by_to_user", ["toUserId"])
+    .index("by_type", ["type"])
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"])
+    .index("by_currency", ["currency"]),
+
+  // ✅ Extended user profiles (temporarily include old wallet fields for migration)
   profiles: defineTable({
     userId: v.id("users"),
     username: v.string(),
@@ -33,14 +52,15 @@ export default defineSchema({
     bio: v.optional(v.string()),
     avatar: v.optional(v.string()), // storage id
     phoneNumber: v.optional(v.string()),
+    interests: v.optional(v.array(v.string())), // Health-related interests
+    // TEMPORARY: Old wallet fields - remove after migration
     walletAddress: v.optional(v.string()),
     privateKey: v.optional(v.string()),
     seedPhrase: v.optional(v.string()),
     walletSeedEnc: v.optional(v.string()),
-    interests: v.optional(v.array(v.string())), // Health-related interests
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
-  }).index("by_username", ["username"]).index("by_wallet", ["walletAddress"]).index("by_userId", ["userId"]),
+  }).index("by_username", ["username"]).index("by_userId", ["userId"]),
 
   // ✅ Articles table
   articles: defineTable({
@@ -56,11 +76,11 @@ export default defineSchema({
     status: v.string(), // DRAFT | PUBLISHED | ARCHIVED
     publishedAt: v.optional(v.number()),
     isSensitive: v.boolean(),
-    // Gating with custom token
+    // Gating with custom token (sellerAddress temporarily optional for migration)
     isGated: v.boolean(),
     priceToken: v.optional(v.string()), // e.g., "USD"
     priceAmount: v.optional(v.number()),
-    sellerAddress: v.optional(v.string()), // wallet address for payments
+    sellerAddress: v.optional(v.string()), // TEMPORARY: Remove after migration
     views: v.number(),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
@@ -75,11 +95,11 @@ export default defineSchema({
     caption: v.optional(v.string()),
     tags: v.array(v.string()),
     isSensitive: v.boolean(),
-    // Gating with custom token
+    // Gating with custom token (sellerAddress temporarily optional for migration)
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
     priceAmount: v.optional(v.number()),
-    sellerAddress: v.optional(v.string()), // wallet address for payments
+    sellerAddress: v.optional(v.string()), // TEMPORARY: Remove after migration
     views: v.number(),
     createdAt: v.number()
   }).index("by_author", ["authorId"]).index("by_created", ["createdAt"]),
@@ -144,17 +164,16 @@ export default defineSchema({
     createdAt: v.number()
   }).index("by_follower", ["followerId"]).index("by_following", ["followingId"]),
 
-  // ✅ Payments audit trail (on-chain tx metadata)
+  // ✅ Payments audit trail (updated for internal transactions)
   payments: defineTable({
     payerId: v.id("users"),
     contentType: v.string(), // 'article' | 'reel'
     contentId: v.union(v.id("articles"), v.id("reels")),
     token: v.string(),
     amount: v.number(),
-    network: v.string(), // e.g., 'celo'
-    txHash: v.optional(v.string()),
+    transactionId: v.string(), // Reference to internal transaction
     createdAt: v.number()
-  }).index("by_content", ["contentType", "contentId"]).index("by_payer", ["payerId"]).index("by_token", ["token"]).index("by_user_content", ["payerId", "contentType", "contentId"]),
+  }).index("by_content", ["contentType", "contentId"]).index("by_payer", ["payerId"]).index("by_token", ["token"]).index("by_user_content", ["payerId", "contentType", "contentId"]).index("by_transaction", ["transactionId"]),
 
   // ✅ Enhanced Notifications table
   notifications: defineTable({

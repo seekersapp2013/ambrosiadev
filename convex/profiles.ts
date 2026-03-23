@@ -15,7 +15,7 @@ export const checkUsernameAvailability = query({
   },
 });
 
-// Create or update user profile
+// Create or update user profile (removed wallet fields)
 export const createOrUpdateProfile = mutation({
   args: {
     username: v.string(),
@@ -23,9 +23,6 @@ export const createOrUpdateProfile = mutation({
     bio: v.optional(v.string()),
     avatar: v.optional(v.string()),
     phoneNumber: v.optional(v.string()),
-    walletAddress: v.optional(v.string()),
-    privateKey: v.optional(v.string()),
-    seedPhrase: v.optional(v.string()),
     interests: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -74,9 +71,6 @@ export const createOrUpdateProfile = mutation({
         if (args.bio !== undefined) updateData.bio = args.bio;
         if (args.avatar !== undefined) updateData.avatar = args.avatar;
         if (args.phoneNumber !== undefined) updateData.phoneNumber = args.phoneNumber;
-        if (args.walletAddress !== undefined) updateData.walletAddress = args.walletAddress;
-        if (args.privateKey !== undefined) updateData.privateKey = args.privateKey;
-        if (args.seedPhrase !== undefined) updateData.seedPhrase = args.seedPhrase;
         if (args.interests !== undefined) updateData.interests = args.interests;
         
         await ctx.db.patch(userProfile._id, updateData);
@@ -92,9 +86,6 @@ export const createOrUpdateProfile = mutation({
           bio: args.bio,
           avatar: args.avatar,
           phoneNumber: args.phoneNumber,
-          walletAddress: args.walletAddress,
-          privateKey: args.privateKey,
-          seedPhrase: args.seedPhrase,
           interests: args.interests,
           createdAt: Date.now(),
         };
@@ -102,30 +93,6 @@ export const createOrUpdateProfile = mutation({
 
         const profileId = await ctx.db.insert("profiles", profileData);
         console.log('Profile created successfully:', profileId);
-        
-        // Create notification for wallet creation if wallet address is provided
-        if (args.walletAddress) {
-          await ctx.db.insert("notifications", {
-            userId,
-            type: "wallet_created",
-            title: "🎉 Wallet Created!",
-            message: `Your crypto wallet has been successfully created. Address: ${args.walletAddress.slice(0, 6)}...${args.walletAddress.slice(-4)}`,
-            isRead: false,
-            category: "system",
-            priority: "medium",
-            relatedContentType: "wallet",
-            relatedContentId: args.walletAddress,
-            deliveryChannels: ["in_app"],
-            deliveryStatus: {
-              in_app: {
-                delivered: true,
-                deliveredAt: Date.now(),
-                viewed: false
-              }
-            },
-            createdAt: Date.now(),
-          });
-        }
         
         return profileId;
       }
@@ -231,9 +198,6 @@ export const getMyProfile = query({
         name: user?.name,
         bio: null,
         avatar: null,
-        walletAddress: null,
-        privateKey: null,
-        seedPhrase: null,
         stats: {
           articles: 0,
           reels: 0,
