@@ -5,7 +5,7 @@ import {
   PaymentFlow, 
   WalletAddressDisplay 
 } from './UnifiedPayment';
-import { WalletBalanceDisplay, WalletAddressInline } from './UnifiedWallet';
+import { WalletBalanceDisplay } from './UnifiedWallet';
 
 /**
  * Demo component showing all unified payment system features
@@ -156,8 +156,8 @@ export function PaymentSystemDemo() {
                 </div>
                 
                 <div className="bg-white rounded-lg p-4 border">
-                  <h3 className="font-semibold mb-3">Inline Address Display</h3>
-                  <WalletAddressInline address={demoProps.sellerAddress} />
+                  <h3 className="font-semibold mb-3">Address Display</h3>
+                  <p className="text-sm text-gray-600">Address display component removed - using new wallet system</p>
                 </div>
                 
                 <div className="bg-white rounded-lg p-4 border">

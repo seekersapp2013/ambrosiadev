@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import axios from "axios";
 import { api } from "../../convex/_generated/api";
 import { InterestSelector } from "./InterestSelector";
+import { PhoneNumberStep } from "./registration/PhoneNumberStep";
+import { PrimaryCurrencyStep } from "./registration/PrimaryCurrencyStep";
+import { PINSetupStep } from "./registration/PINSetupStep";
+import { ConfirmationStep } from "./registration/ConfirmationStep";
+import { phoneDetectionService } from "../utils/phoneDetection";
+import { pinService } from "../utils/pinSecurity";
+import { getCurrencyForCountry } from "../utils/currencyConfig";
+import type { PhoneDetectionResult } from "../utils/phoneDetection";
 
 interface FormData {
   email: string;
@@ -11,6 +18,11 @@ interface FormData {
   name: string;
   username: string;
   phoneNumber: string;
+  detectedCountry: string;
+  phoneCountryCode: string;
+  primaryCurrency: string;
+  pin: string;
+  confirmPin: string;
   interests: string[];
 }
 
@@ -21,16 +33,21 @@ export function AuthForm() {
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Form data state
+  // Form data state with enhanced fields
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
     name: "",
     username: "",
     phoneNumber: "",
+    detectedCountry: "",
+    phoneCountryCode: "",
+    primaryCurrency: "USD", // Default
+    pin: "",
+    confirmPin: "",
     interests: []
   });
   
@@ -39,7 +56,9 @@ export function AuthForm() {
   const [stepValidation, setStepValidation] = useState({
     step1: false,
     step2: false,
-    step3: false
+    step3: false,
+    step4: false,
+    step5: false
   });
 
   // Check username availability
@@ -53,6 +72,18 @@ export function AuthForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Handle phone country detection
+  const handleCountryDetected = (result: PhoneDetectionResult) => {
+    if (result.isValid) {
+      setFormData(prev => ({
+        ...prev,
+        detectedCountry: result.country,
+        phoneCountryCode: result.countryCode,
+        primaryCurrency: result.currency // Auto-suggest currency
+      }));
+    }
+  };
+
   // Step validation functions with real-time updates
   const validateStep1 = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -64,17 +95,34 @@ export function AuthForm() {
   };
 
   const validateStep2 = () => {
-    const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
     const isUsernameValid = validateUsername(formData.username);
-    const isPhoneValid = !formData.phoneNumber || phoneRegex.test(formData.phoneNumber);
-    const isValid = isUsernameValid && isPhoneValid;
+    const isValid = isUsernameValid;
     setStepValidation(prev => ({ ...prev, step2: isValid }));
     return isValid;
   };
 
   const validateStep3 = () => {
-    // Step 3 is always valid (interests are optional)
-    setStepValidation(prev => ({ ...prev, step3: true }));
+    const phoneValidation = phoneDetectionService.validatePhoneNumber(formData.phoneNumber);
+    const isValid = phoneValidation.isValid;
+    setStepValidation(prev => ({ ...prev, step3: isValid }));
+    return isValid;
+  };
+
+  const validateStep4 = () => {
+    const isValid = !!formData.primaryCurrency;
+    setStepValidation(prev => ({ ...prev, step4: isValid }));
+    return isValid;
+  };
+
+  const validateStep5 = () => {
+    const pinValidation = pinService.validatePINFormat(formData.pin);
+    const isValid = pinValidation.isValid && formData.pin === formData.confirmPin;
+    setStepValidation(prev => ({ ...prev, step5: isValid }));
+    return isValid;
+  };
+
+  const validateStep6 = () => {
+    // Interests step is always valid (optional)
     return true;
   };
 
@@ -86,6 +134,12 @@ export function AuthForm() {
       validateStep2();
     } else if (currentStep === 3) {
       validateStep3();
+    } else if (currentStep === 4) {
+      validateStep4();
+    } else if (currentStep === 5) {
+      validateStep5();
+    } else if (currentStep === 6) {
+      validateStep6();
     }
   }, [formData, currentStep, usernameCheck]);
 
@@ -132,9 +186,27 @@ export function AuthForm() {
         setError("Please complete your profile information");
         return;
       }
+    } else if (currentStep === 3) {
+      canProceed = validateStep3();
+      if (!canProceed) {
+        setError("Please enter a valid phone number");
+        return;
+      }
+    } else if (currentStep === 4) {
+      canProceed = validateStep4();
+      if (!canProceed) {
+        setError("Please select a primary currency");
+        return;
+      }
+    } else if (currentStep === 5) {
+      canProceed = validateStep5();
+      if (!canProceed) {
+        setError("Please create a valid PIN");
+        return;
+      }
     }
     
-    if (canProceed && currentStep < 3) {
+    if (canProceed && currentStep < 6) {
       setCurrentStep(currentStep + 1);
       setError(null);
     }
@@ -152,7 +224,7 @@ export function AuthForm() {
     if (flow === "signUp") {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        if (currentStep < 3) {
+        if (currentStep < 6) {
           nextStep();
         }
       } else if (e.key === "Escape" && currentStep > 1) {
@@ -172,6 +244,11 @@ export function AuthForm() {
       name: "",
       username: "",
       phoneNumber: "",
+      detectedCountry: "",
+      phoneCountryCode: "",
+      primaryCurrency: "USD",
+      pin: "",
+      confirmPin: "",
       interests: []
     });
     setUsernameError(null);
@@ -194,16 +271,15 @@ export function AuthForm() {
       return;
     }
 
-    // Handle sign up - validate all steps
-    if (!validateStep1() || !validateStep2()) {
-      setError("Please complete all required information");
-      return;
-    }
+    // Handle enhanced sign up
+    await handleEnhancedSignUp();
+  };
 
-    // Validate phone number format
-    const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
-    if (formData.phoneNumber && !phoneRegex.test(formData.phoneNumber)) {
-      setError("Please enter a valid phone number");
+  const handleEnhancedSignUp = async () => {
+    // Validate all steps
+    if (!validateStep1() || !validateStep2() || !validateStep3() || 
+        !validateStep4() || !validateStep5()) {
+      setError("Please complete all required information");
       return;
     }
 
@@ -212,40 +288,83 @@ export function AuthForm() {
       return;
     }
 
-    // Create FormData for sign in
-    const signInFormData = new FormData();
-    signInFormData.set("email", formData.email);
-    signInFormData.set("password", formData.password);
-    signInFormData.set("name", formData.name);
-    signInFormData.set("phoneNumber", formData.phoneNumber);
-    signInFormData.set("flow", flow);
+    // Validate phone number
+    const phoneValidation = phoneDetectionService.validatePhoneNumber(formData.phoneNumber);
+    if (!phoneValidation.isValid) {
+      setError("Please enter a valid phone number");
+      return;
+    }
+
+    // Validate PIN
+    const pinValidation = pinService.validatePINFormat(formData.pin);
+    if (!pinValidation.isValid) {
+      setError("Please create a valid PIN");
+      return;
+    }
+
+    if (formData.pin !== formData.confirmPin) {
+      setError("PINs do not match");
+      return;
+    }
+
+    setIsCreatingAccount(true);
+    setError(null);
 
     try {
+      // Hash the PIN before sending to backend
+      const hashedPIN = await pinService.hashPIN(formData.pin);
+
+      // Create FormData for sign in
+      const signInFormData = new FormData();
+      signInFormData.set("email", formData.email);
+      signInFormData.set("password", formData.password);
+      signInFormData.set("name", formData.name);
+      signInFormData.set("phoneNumber", formData.phoneNumber);
+      signInFormData.set("flow", flow);
+
+      // Sign in first
       await signIn("password", signInFormData);
 
-      if (flow === "signUp") {
-        // Create profile with user data (wallet created automatically in auth callback)
-        await createOrUpdateProfile({
-          username: formData.username,
-          name: formData.name,
-          phoneNumber: formData.phoneNumber,
-          interests: formData.interests,
-        });
+      // Create enhanced profile with all new fields
+      await createOrUpdateProfile({
+        username: formData.username,
+        name: formData.name,
+        phoneNumber: formData.phoneNumber,
+        phoneCountryCode: formData.phoneCountryCode,
+        detectedCountry: formData.detectedCountry,
+        pinHash: hashedPIN,
+        primaryCurrency: formData.primaryCurrency,
+        interests: formData.interests,
+      });
 
-        // Send welcome email
-        await sendEmail({
-          to: formData.email,
-          subject: "🎉 Welcome to Ambrosia!",
-          body: `🎉 **Welcome to Ambrosia!**
+      // Send enhanced welcome email
+      await sendEmail({
+        to: formData.email,
+        subject: "🎉 Welcome to Ambrosia - Your Multi-Currency Wallet is Ready!",
+        body: `🎉 **Welcome to Ambrosia!**
 
-Your account has been successfully created with a $0 wallet balance.
+Your account has been successfully created with a multi-currency wallet supporting 9 currencies.
+
+---
+
+**Your Account Details:**
+- Primary Currency: ${formData.primaryCurrency}
+- Detected Country: ${formData.detectedCountry}
+- Phone: ${formData.phoneNumber}
+
+**Wallet Features:**
+- ✅ Multi-currency deposits (USD, NGN, GBP, EUR, CAD, GHS, KES, GMD, ZAR)
+- 🔒 PIN-protected withdrawals (NGN only)
+- 💱 Real-time currency conversion
+- 📊 Balance tracking in all currencies
 
 ---
 
 **Getting Started:**
 - Explore free content on the platform
-- Deposit funds to access premium content
+- Deposit funds in any supported currency
 - Create your own content and earn from your audience
+- Use your PIN for secure withdrawals
 
 ---
 
@@ -253,35 +372,35 @@ Thank you for choosing **Ambrosia**. If you have any questions, feel free to rea
 
 Warm regards,
 **The Ambrosia Team**`.trim(),
-        });
-      }
+      });
+
     } catch (authErr: any) {
       setError(authErr.message);
-      setIsCreatingWallet(false);
+    } finally {
+      setIsCreatingAccount(false);
     }
   };
 
   // Step indicator component
   const StepIndicator = () => (
     <div className="flex items-center justify-center mb-8">
-      <div className="flex items-center space-x-4">
-        {[1, 2, 3].map((step) => (
+      <div className="flex items-center space-x-2">
+        {[1, 2, 3, 4, 5, 6].map((step) => (
           <div key={step} className="flex items-center">
             <div
-              className={`w-13 h-13 rounded-full flex items-center justify-center text-base font-bold step-indicator-transition ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold step-indicator-transition ${
                 step === currentStep
                   ? "bg-white/40 text-gray-800 border-2 border-white/60 backdrop-blur-sm shadow-sm scale-110"
                   : step < currentStep
                   ? "bg-black text-white border-2 border-black shadow-sm"
                   : "bg-white/20 text-gray-600 border-2 border-white/30 backdrop-blur-sm"
               }`}
-              style={{ width: '52px', height: '52px' }}
             >
               {step}
             </div>
-            {step < 3 && (
+            {step < 6 && (
               <div
-                className={`w-10 h-0.5 mx-2 step-indicator-transition ${
+                className={`w-6 h-0.5 mx-1 step-indicator-transition ${
                   step < currentStep ? "bg-black" : "bg-white/30"
                 }`}
               />
@@ -291,9 +410,9 @@ Warm regards,
       </div>
       
       {/* Step Progress Text */}
-      <div className="absolute mt-16 text-center">
-        <p className="text-sm text-gray-600 font-medium">
-          Step {currentStep} of 3
+      <div className="absolute mt-14 text-center">
+        <p className="text-xs text-gray-600 font-medium">
+          Step {currentStep} of 6
         </p>
       </div>
     </div>
@@ -582,31 +701,81 @@ Warm regards,
               </div>
             </>
           ) : (
-            // Sign Up Wizard Steps
+            // Enhanced Sign Up Wizard Steps
             <>
               {currentStep === 1 && renderStep1()}
               {currentStep === 2 && renderStep2()}
-              {currentStep === 3 && renderStep3()}
+              {currentStep === 3 && (
+                <PhoneNumberStep
+                  phoneNumber={formData.phoneNumber}
+                  onPhoneChange={(phone) => updateFormData("phoneNumber", phone)}
+                  onCountryDetected={handleCountryDetected}
+                  onNext={nextStep}
+                  onBack={prevStep}
+                />
+              )}
+              {currentStep === 4 && (
+                <PrimaryCurrencyStep
+                  detectedCountry={formData.detectedCountry}
+                  selectedCurrency={formData.primaryCurrency}
+                  onCurrencySelect={(currency) => updateFormData("primaryCurrency", currency)}
+                  onNext={nextStep}
+                  onBack={prevStep}
+                />
+              )}
+              {currentStep === 5 && (
+                <PINSetupStep
+                  pin={formData.pin}
+                  confirmPin={formData.confirmPin}
+                  onPinChange={(pin) => updateFormData("pin", pin)}
+                  onConfirmPinChange={(confirmPin) => updateFormData("confirmPin", confirmPin)}
+                  onNext={nextStep}
+                  onBack={prevStep}
+                />
+              )}
+              {currentStep === 6 && (
+                <div className="space-y-5 animate-fade-in">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Health Interests</h2>
+                    <p className="text-gray-600">Tell us what you're interested in (optional)</p>
+                  </div>
+
+                  <div className="bg-white/15 backdrop-blur-sm rounded-3xl p-4 border border-white/20">
+                    <InterestSelector
+                      selectedInterests={formData.interests}
+                      onInterestsChange={(interests) => updateFormData("interests", interests)}
+                      showTitle={false}
+                    />
+                  </div>
+
+                  <ConfirmationStep
+                    formData={formData}
+                    onSubmit={handleEnhancedSignUp}
+                    onBack={prevStep}
+                    isSubmitting={isCreatingAccount}
+                  />
+                </div>
+              )}
             </>
           )}
 
           {/* Navigation Buttons */}
           {flow === "signUp" ? (
             <div className="pt-2 space-y-3">
-              {/* Step Navigation */}
-              <div className="flex gap-3">
-                {currentStep > 1 && (
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="flex-1 py-4 rounded-3xl text-lg font-bold border-2 border-white/40 text-gray-700 hover:bg-white/20 step-nav-button bg-white/10 backdrop-blur-sm"
-                  >
-                    <i className="fas fa-arrow-left mr-2"></i>
-                    Back
-                  </button>
-                )}
-                
-                {currentStep < 3 ? (
+              {/* Only show navigation for steps 1-2, other steps handle their own navigation */}
+              {(currentStep === 1 || currentStep === 2) && (
+                <div className="flex gap-3">
+                  {currentStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className="flex-1 py-4 rounded-3xl text-lg font-bold border-2 border-white/40 text-gray-700 hover:bg-white/20 step-nav-button bg-white/10 backdrop-blur-sm"
+                    >
+                      <i className="fas fa-arrow-left mr-2"></i>
+                      Back
+                    </button>
+                  )}
+                  
                   <button
                     type="button"
                     onClick={nextStep}
@@ -619,32 +788,14 @@ Warm regards,
                     Next
                     <i className="fas fa-arrow-right ml-2"></i>
                   </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={isCreatingWallet}
-                    className="flex-1 black-button py-4 rounded-3xl text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
-                  >
-                    {isCreatingWallet ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full"></div>
-                        Creating account...
-                      </div>
-                    ) : (
-                      <>
-                        <i className="fas fa-rocket mr-2"></i>
-                        Create Account
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
               
               {/* Progress Indicator */}
               <div className="w-full bg-white/20 rounded-full h-2 backdrop-blur-sm">
                 <div 
                   className="bg-gradient-to-r from-pink-400 to-purple-500 h-2 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${(currentStep / 3) * 100}%` }}
+                  style={{ width: `${(currentStep / 6) * 100}%` }}
                 ></div>
               </div>
             </div>
@@ -682,18 +833,18 @@ Warm regards,
           )}
 
           {/* Info Messages */}
-          {flow === "signUp" && !isCreatingWallet && currentStep === 1 && (
+          {flow === "signUp" && !isCreatingAccount && currentStep === 1 && (
             <div className="bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 rounded-3xl p-4">
               <p className="text-blue-800 text-sm font-medium">
-                📱 A crypto wallet will be automatically created for you upon signup
+                📱 A multi-currency wallet will be automatically created for you upon signup
               </p>
             </div>
           )}
 
-          {isCreatingWallet && (
+          {isCreatingAccount && (
             <div className="bg-green-500/20 backdrop-blur-sm border border-green-400/30 rounded-3xl p-4">
               <p className="text-green-800 text-sm font-medium">
-                Creating your wallet and sending details to your email...
+                Creating your multi-currency wallet and sending details to your email...
               </p>
             </div>
           )}

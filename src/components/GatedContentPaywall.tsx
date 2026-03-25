@@ -9,6 +9,7 @@ interface GatedContentPaywallProps {
     title: string;
     price: number;
     token: string;
+    sellerAddress?: string; // Optional for backward compatibility
     onUnlock: () => void;
     onFundWallet?: () => void;
 }
@@ -18,6 +19,7 @@ export function GatedContentPaywall({
     contentId,
     price,
     token,
+    sellerAddress, // Accept but ignore for now
     onUnlock,
     onFundWallet
 }: GatedContentPaywallProps) {
@@ -26,12 +28,12 @@ export function GatedContentPaywall({
     const [errorMessage, setErrorMessage] = useState("");
 
     const myProfile = useQuery(api.profiles.getMyProfile);
-    const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+    const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, { currency: "USD" });
     const purchaseContent = useMutation(api.payments.purchaseContent);
 
     // Check if user has sufficient balance (using USD for content purchases)
-    const hasSufficientBalance = walletBalance ? walletBalance.balanceUSD >= price : false;
-    const currentBalance = walletBalance ? walletBalance.balanceUSD.toFixed(2) : "0.00";
+    const hasSufficientBalance = walletBalance ? walletBalance.balances.USD >= price : false;
+    const currentBalance = walletBalance ? walletBalance.balances.USD.toFixed(2) : "0.00";
 
     const handlePurchase = async () => {
         if (!contentId) {
@@ -193,7 +195,7 @@ export function GatedContentPaywall({
                     </div>
                     {!hasSufficientBalance && (
                         <p className="text-red-600 text-sm mt-2">
-                            Insufficient balance. Need ${(price - (walletBalance?.balanceUSD || 0)).toFixed(2)} more.
+                            Insufficient balance. Need ${(price - (walletBalance?.balances.USD || 0)).toFixed(2)} more.
                         </p>
                     )}
                 </div>

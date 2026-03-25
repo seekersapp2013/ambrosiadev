@@ -79,7 +79,7 @@ export const purchaseContent = mutation({
 
     // For now, we'll use USD for content purchases
     const currency = "USD";
-    const buyerBalance = buyerWallet.balanceUSD;
+    const buyerBalance = buyerWallet.balances.USD;
 
     if (buyerBalance < args.priceAmount) {
       throw new Error("Insufficient balance");
@@ -98,8 +98,12 @@ export const purchaseContent = mutation({
     if (!sellerWallet) {
       const walletId = await ctx.db.insert("wallets", {
         userId: contentAuthorId,
-        balanceUSD: 0,
-        balanceNGN: 0,
+        primaryCurrency: "USD", // Default primary currency
+        phoneCountryDetected: false,
+        balances: {
+          USD: 0, NGN: 0, GBP: 0, EUR: 0,
+          CAD: 0, GHS: 0, KES: 0, GMD: 0, ZAR: 0
+        },
         createdAt: Date.now(),
       });
       sellerWallet = await ctx.db.get(walletId);
@@ -153,8 +157,10 @@ export const purchaseContent = mutation({
     }
 
     // Update buyer balance
+    const newBuyerBalances = { ...buyerWallet.balances };
+    newBuyerBalances.USD -= args.priceAmount;
     await ctx.db.patch(buyerWallet._id, {
-      balanceUSD: buyerWallet.balanceUSD - args.priceAmount,
+      balances: newBuyerBalances,
       updatedAt: Date.now(),
     });
 
@@ -162,8 +168,10 @@ export const purchaseContent = mutation({
     if (!sellerWallet) {
       throw new Error("Seller wallet not found");
     }
+    const newSellerBalances = { ...sellerWallet.balances };
+    newSellerBalances.USD += sellerAmount;
     await ctx.db.patch(sellerWallet._id, {
-      balanceUSD: sellerWallet.balanceUSD + sellerAmount,
+      balances: newSellerBalances,
       updatedAt: Date.now(),
     });
 

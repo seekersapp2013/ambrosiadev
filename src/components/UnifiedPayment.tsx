@@ -181,8 +181,6 @@ export function PaymentFlow({
         contentId,
         priceToken: token,
         priceAmount: price,
-        txHash: txHash.trim(),
-        network: "celo",
       });
       
       onSuccess();

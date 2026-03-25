@@ -6,7 +6,7 @@ import { internal } from "../_generated/api";
 export const depositFunds = mutation({
   args: {
     amount: v.number(),
-    currency: v.string(), // "USD" or "NGN"
+    currency: v.string(), // Any of the 9 supported currencies
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -18,8 +18,10 @@ export const depositFunds = mutation({
       throw new Error("Amount must be greater than 0");
     }
 
-    if (!["USD", "NGN"].includes(args.currency)) {
-      throw new Error("Currency must be USD or NGN");
+    // Validate currency
+    const supportedCurrencies = ["USD", "NGN", "GBP", "EUR", "CAD", "GHS", "KES", "GMD", "ZAR"];
+    if (!supportedCurrencies.includes(args.currency)) {
+      throw new Error(`Currency ${args.currency} not supported for deposits`);
     }
 
     // Get or create wallet
@@ -31,8 +33,12 @@ export const depositFunds = mutation({
     if (!wallet) {
       const walletId = await ctx.db.insert("wallets", {
         userId,
-        balanceUSD: 0,
-        balanceNGN: 0,
+        primaryCurrency: args.currency, // Set primary currency to deposit currency
+        phoneCountryDetected: false,
+        balances: {
+          USD: 0, NGN: 0, GBP: 0, EUR: 0, CAD: 0,
+          GHS: 0, KES: 0, GMD: 0, ZAR: 0
+        },
         createdAt: Date.now(),
       });
       wallet = await ctx.db.get(walletId);
@@ -57,18 +63,17 @@ export const depositFunds = mutation({
       completedAt: Date.now(),
     });
 
-    // Update wallet balance based on currency
-    const updateData: any = { updatedAt: Date.now() };
-    if (args.currency === "USD") {
-      updateData.balanceUSD = wallet.balanceUSD + args.amount;
-    } else {
-      updateData.balanceNGN = wallet.balanceNGN + args.amount;
-    }
+    // Update wallet balance for the specific currency
+    const currentBalances = wallet.balances;
+    const newBalances = {
+      ...currentBalances,
+      [args.currency]: currentBalances[args.currency as keyof typeof currentBalances] + args.amount
+    };
 
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
-    await ctx.db.patch(wallet._id, updateData);
+    await ctx.db.patch(wallet._id, {
+      balances: newBalances,
+      updatedAt: Date.now()
+    });
 
     // Send notification
     await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {
@@ -81,9 +86,7 @@ export const depositFunds = mutation({
       },
     });
 
-    const newBalance = args.currency === "USD" 
-      ? wallet.balanceUSD + args.amount 
-      : wallet.balanceNGN + args.amount;
+    const newBalance = newBalances[args.currency as keyof typeof newBalances];
 
     return {
       success: true,

@@ -7,6 +7,7 @@ interface FundWalletProps {
 
 export function FundWallet({ onBack }: FundWalletProps) {
     const myProfile = useQuery(api.profiles.getMyProfile);
+    const myWallet = useQuery(api.wallets.getWalletBalance.getMyWallet);
 
     return (
         <div className="bg-white min-h-screen">
@@ -27,28 +28,28 @@ export function FundWallet({ onBack }: FundWalletProps) {
                     </div>
                     <h2 className="text-2xl font-bold mb-2">Fund Your Wallet</h2>
                     <p className="text-gray-600">
-                        Get tokens added to your wallet to make payments
+                        Add funds to your multi-currency wallet to make payments
                     </p>
                 </div>
 
-                {/* Wallet Address Display */}
-                {myProfile?.walletAddress && (
+                {/* Wallet Status */}
+                {myWallet ? (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                        <h3 className="font-semibold text-gray-800 mb-2">Your Wallet Address:</h3>
+                        <h3 className="font-semibold text-gray-800 mb-2">Your Wallet Status:</h3>
                         <div className="bg-white border border-gray-200 rounded-lg p-3">
-                            <div className="flex items-center justify-between">
-                                <code className="text-sm font-mono text-gray-800 break-all">
-                                    {myProfile.walletAddress}
-                                </code>
-                                <button
-                                    onClick={() => navigator.clipboard.writeText(myProfile.walletAddress!)}
-                                    className="ml-2 text-accent hover:text-accent-dark"
-                                    title="Copy address"
-                                >
-                                    <i className="fas fa-copy"></i>
-                                </button>
+                            <div className="text-sm text-gray-600">
+                                <p><strong>Primary Currency:</strong> {myWallet.primaryCurrency}</p>
+                                <p><strong>Wallet ID:</strong> <code className="text-xs">{myWallet._id}</code></p>
+                                <p><strong>Created:</strong> {new Date(myWallet.createdAt).toLocaleDateString()}</p>
                             </div>
                         </div>
+                    </div>
+                ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                        <p className="text-yellow-800">
+                            <i className="fas fa-exclamation-triangle mr-2"></i>
+                            No wallet found. Please create a wallet first.
+                        </p>
                     </div>
                 )}
 
@@ -60,7 +61,7 @@ export function FundWallet({ onBack }: FundWalletProps) {
                     </h3>
                     <div className="space-y-4 text-blue-700">
                         <p className="text-sm">
-                            To add funds to your wallet, please contact our admin team with your wallet address.
+                            To add funds to your multi-currency wallet, please contact our admin team with your wallet information.
                         </p>
 
                         <div className="bg-white border border-blue-200 rounded-lg p-4">
@@ -79,9 +80,10 @@ export function FundWallet({ onBack }: FundWalletProps) {
                         <div className="text-sm">
                             <p className="font-semibold mb-2">Include in your email:</p>
                             <ul className="list-disc list-inside space-y-1 ml-4">
-                                <li>Your wallet address (shown above)</li>
+                                <li>Your username: {myProfile?.username || '[Not set]'}</li>
+                                <li>Your wallet ID: {myWallet?._id || '[No wallet]'}</li>
                                 <li>The amount you need</li>
-                                <li>The token type (USD or CELO)</li>
+                                <li>The currency (USD, NGN, GBP, EUR, CAD, GHS, KES, GMD, ZAR)</li>
                             </ul>
                         </div>
                     </div>
@@ -91,11 +93,12 @@ export function FundWallet({ onBack }: FundWalletProps) {
                 <div className="space-y-3">
                     <button
                         onClick={() => {
-                            const subject = "Wallet Funding Request";
-                            const body = `Hello,\n\nI would like to request funding for my wallet.\n\nWallet Address: ${myProfile?.walletAddress || '[Your wallet address]'}\nAmount Needed: [Enter amount]\nToken Type: [USD/CELO]\n\nThank you!`;
+                            const subject = "Multi-Currency Wallet Funding Request";
+                            const body = `Hello,\n\nI would like to request funding for my multi-currency wallet.\n\nUsername: ${myProfile?.username || '[Not set]'}\nWallet ID: ${myWallet?._id || '[No wallet created]'}\nAmount Needed: [Enter amount]\nCurrency: [USD/NGN/GBP/EUR/CAD/GHS/KES/GMD/ZAR]\n\nThank you!`;
                             window.open(`mailto:graderng@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
                         }}
                         className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+                        disabled={!myWallet}
                     >
                         <i className="fas fa-envelope mr-2"></i>
                         Send Funding Request Email
@@ -114,6 +117,7 @@ export function FundWallet({ onBack }: FundWalletProps) {
                 <div className="mt-8 text-center">
                     <p className="text-xs text-gray-500">
                         Funding requests are typically processed within 24 hours during business days.
+                        Supported currencies: USD, NGN, GBP, EUR, CAD, GHS, KES, GMD, ZAR
                     </p>
                 </div>
             </div>

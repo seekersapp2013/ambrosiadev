@@ -19,11 +19,22 @@ export const createWallet = mutation({
       return existingWallet;
     }
 
-    // Create new wallet with 0 balance for both currencies
+    // Create new wallet with 0 balance for all currencies
     const walletId = await ctx.db.insert("wallets", {
       userId,
-      balanceUSD: 0,
-      balanceNGN: 0,
+      primaryCurrency: "USD", // Default primary currency
+      phoneCountryDetected: false, // Will be updated when user completes profile
+      balances: {
+        USD: 0,
+        NGN: 0,
+        GBP: 0,
+        EUR: 0,
+        CAD: 0,
+        GHS: 0,
+        KES: 0,
+        GMD: 0,
+        ZAR: 0
+      },
       createdAt: Date.now(),
     });
 

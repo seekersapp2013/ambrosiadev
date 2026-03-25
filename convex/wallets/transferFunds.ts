@@ -20,8 +20,9 @@ export const transferFunds = mutation({
       throw new Error("Amount must be greater than 0");
     }
 
-    if (!["USD", "NGN"].includes(args.currency)) {
-      throw new Error("Currency must be USD or NGN");
+    const supportedCurrencies = ["USD", "NGN", "GBP", "EUR", "CAD", "GHS", "KES", "GMD", "ZAR"];
+    if (!supportedCurrencies.includes(args.currency)) {
+      throw new Error(`Currency must be one of: ${supportedCurrencies.join(", ")}`);
     }
 
     // Find recipient by username
@@ -50,7 +51,7 @@ export const transferFunds = mutation({
       throw new Error("Sender wallet not found");
     }
 
-    const senderBalance = args.currency === "USD" ? senderWallet.balanceUSD : senderWallet.balanceNGN;
+    const senderBalance = senderWallet.balances[args.currency as keyof typeof senderWallet.balances];
 
     if (senderBalance < args.amount) {
       throw new Error("Insufficient balance");
@@ -65,8 +66,12 @@ export const transferFunds = mutation({
     if (!recipientWallet) {
       const walletId = await ctx.db.insert("wallets", {
         userId: recipientUserId,
-        balanceUSD: 0,
-        balanceNGN: 0,
+        primaryCurrency: "USD", // Default primary currency
+        phoneCountryDetected: false,
+        balances: {
+          USD: 0, NGN: 0, GBP: 0, EUR: 0,
+          CAD: 0, GHS: 0, KES: 0, GMD: 0, ZAR: 0
+        },
         createdAt: Date.now(),
       });
       recipientWallet = await ctx.db.get(walletId);
@@ -96,21 +101,21 @@ export const transferFunds = mutation({
     });
 
     // Update sender balance
-    const senderUpdateData: any = { updatedAt: Date.now() };
-    if (args.currency === "USD") {
-      senderUpdateData.balanceUSD = senderWallet.balanceUSD - args.amount;
-    } else {
-      senderUpdateData.balanceNGN = senderWallet.balanceNGN - args.amount;
-    }
+    const newSenderBalances = { ...senderWallet.balances };
+    newSenderBalances[args.currency as keyof typeof newSenderBalances] -= args.amount;
+    const senderUpdateData = { 
+      balances: newSenderBalances,
+      updatedAt: Date.now() 
+    };
     await ctx.db.patch(senderWallet._id, senderUpdateData);
 
     // Update recipient balance
-    const recipientUpdateData: any = { updatedAt: Date.now() };
-    if (args.currency === "USD") {
-      recipientUpdateData.balanceUSD = recipientWallet.balanceUSD + args.amount;
-    } else {
-      recipientUpdateData.balanceNGN = recipientWallet.balanceNGN + args.amount;
-    }
+    const newRecipientBalances = { ...recipientWallet.balances };
+    newRecipientBalances[args.currency as keyof typeof newRecipientBalances] += args.amount;
+    const recipientUpdateData = { 
+      balances: newRecipientBalances,
+      updatedAt: Date.now() 
+    };
     if (!recipientWallet) {
       throw new Error("Recipient wallet not found");
     }

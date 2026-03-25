@@ -19,16 +19,19 @@ export const getWalletBalance = query({
 
     if (!wallet) {
       return { 
-        balanceUSD: 0, 
-        balanceNGN: 0,
+        balances: {
+          USD: 0, NGN: 0, GBP: 0, EUR: 0, CAD: 0,
+          GHS: 0, KES: 0, GMD: 0, ZAR: 0
+        },
+        primaryCurrency: "USD",
         currency: args.currency || "USD"
       };
     }
 
     return { 
-      balanceUSD: wallet.balanceUSD, 
-      balanceNGN: wallet.balanceNGN,
-      currency: args.currency || "USD"
+      balances: wallet.balances,
+      primaryCurrency: wallet.primaryCurrency,
+      currency: args.currency || wallet.primaryCurrency
     };
   },
 });

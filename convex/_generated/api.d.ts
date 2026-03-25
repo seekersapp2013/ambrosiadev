@@ -32,6 +32,7 @@ import type * as liveStream from "../liveStream.js";
 import type * as livekit from "../livekit.js";
 import type * as livekitActions from "../livekitActions.js";
 import type * as migrations from "../migrations.js";
+import type * as migrations_migrateToMultiCurrency from "../migrations/migrateToMultiCurrency.js";
 import type * as migrations_removeSellerAddress from "../migrations/removeSellerAddress.js";
 import type * as notificationAnalytics from "../notificationAnalytics.js";
 import type * as notifications from "../notifications.js";
@@ -51,6 +52,7 @@ import type * as wallets_getMyWallet from "../wallets/getMyWallet.js";
 import type * as wallets_getTransactionHistory from "../wallets/getTransactionHistory.js";
 import type * as wallets_getWalletBalance from "../wallets/getWalletBalance.js";
 import type * as wallets_transferFunds from "../wallets/transferFunds.js";
+import type * as wallets_updatePrimaryCurrency from "../wallets/updatePrimaryCurrency.js";
 import type * as wallets_withdrawFunds from "../wallets/withdrawFunds.js";
 
 import type {
@@ -84,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   livekit: typeof livekit;
   livekitActions: typeof livekitActions;
   migrations: typeof migrations;
+  "migrations/migrateToMultiCurrency": typeof migrations_migrateToMultiCurrency;
   "migrations/removeSellerAddress": typeof migrations_removeSellerAddress;
   notificationAnalytics: typeof notificationAnalytics;
   notifications: typeof notifications;
@@ -103,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   "wallets/getTransactionHistory": typeof wallets_getTransactionHistory;
   "wallets/getWalletBalance": typeof wallets_getWalletBalance;
   "wallets/transferFunds": typeof wallets_transferFunds;
+  "wallets/updatePrimaryCurrency": typeof wallets_updatePrimaryCurrency;
   "wallets/withdrawFunds": typeof wallets_withdrawFunds;
 }>;
 

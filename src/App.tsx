@@ -32,7 +32,9 @@ import { PublicArticleViewer } from "./components/PublicArticleViewer";
 import { WalletBalance } from "./components/WalletBalance";
 import { FundWallet } from "./components/FundWallet";
 
-import { TransferFunds } from "./components/TransferFunds";
+import { Deposit } from "./components/Deposit";
+import { Withdrawal } from "./components/Withdrawal";
+import { Transfer } from "./components/Transfer";
 import { SendEmailForm } from "./components/SendEmailForm";
 import { GenerateWallet } from "./components/GenerateWallet";
 import { EmailHistory } from "./components/EmailHistory";
@@ -131,8 +133,14 @@ function MainApp() {
         return <WalletBalance onNavigate={showScreen} />;
       case 'fund-wallet':
         return <FundWallet onBack={() => showScreen('wallet-balance')} />;
+      case 'deposit-screen':
+        return <Deposit onBack={() => showScreen('wallet-balance')} />;
+      case 'withdrawal-screen':
+        return <Withdrawal onBack={() => showScreen('wallet-balance')} />;
+      case 'transfer-screen':
+        return <Transfer onBack={() => showScreen('wallet-balance')} />;
       case 'transfer-funds':
-        return <TransferFunds />;
+        return <Transfer onBack={() => showScreen('wallet-balance')} />;
       case 'send-email':
         return <SendEmailForm />;
       case 'generate-wallet':

@@ -15,26 +15,64 @@ export default defineSchema({
     .index("emailId", ["emailId"])
     .index("notificationId", ["notificationId"]),
 
-  // ✅ Refactored wallet table for record-based system
+  // ✅ Currency metadata and exchange rates
+  currencyMetadata: defineTable({
+    code: v.string(), // Currency code (USD, NGN, etc.)
+    name: v.string(), // Full name (US Dollar, Nigerian Naira, etc.)
+    symbol: v.string(), // Currency symbol ($, ₦, etc.)
+    decimals: v.number(), // Number of decimal places
+    isActive: v.boolean(), // Whether currency is currently supported
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_code", ["code"])
+    .index("by_active", ["isActive"]),
+
+  // ✅ Exchange rates cache
+  exchangeRates: defineTable({
+    baseCurrency: v.string(), // Base currency (e.g., USD)
+    targetCurrency: v.string(), // Target currency (e.g., NGN)
+    rate: v.number(), // Exchange rate
+    source: v.string(), // API source (exchangerate-api, frankfurter, etc.)
+    lastUpdated: v.number(), // Timestamp of last update
+    expiresAt: v.number(), // When this rate expires
+    createdAt: v.number()
+  }).index("by_pair", ["baseCurrency", "targetCurrency"])
+    .index("by_base", ["baseCurrency"])
+    .index("by_expires", ["expiresAt"])
+    .index("by_source", ["source"]),
+
+  // ✅ Multi-currency wallet table
   wallets: defineTable({
     userId: v.id("users"),      // Link to authenticated user
-    balanceUSD: v.number(),     // USD balance
-    balanceNGN: v.number(),     // NGN balance
+    primaryCurrency: v.string(), // User's primary currency (USD, NGN, GBP, etc.)
+    phoneCountryDetected: v.boolean(), // Whether country was detected from phone
+    balances: v.object({
+      USD: v.number(),
+      NGN: v.number(),
+      GBP: v.number(),
+      EUR: v.number(),
+      CAD: v.number(),
+      GHS: v.number(),
+      KES: v.number(),
+      GMD: v.number(),
+      ZAR: v.number()
+    }),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
-  }).index("userId", ["userId"]),
+  }).index("userId", ["userId"])
+    .index("by_primary_currency", ["primaryCurrency"]),
 
-  // ✅ Transactions table for wallet operations
+  // ✅ Multi-currency transactions table
   transactions: defineTable({
     id: v.string(),             // Unique transaction ID
     fromUserId: v.optional(v.id("users")), // null for deposits
     toUserId: v.optional(v.id("users")),   // null for withdrawals
     amount: v.number(),
-    currency: v.string(),       // "USD" or "NGN"
+    currency: v.string(),       // Any of the 9 supported currencies
     type: v.string(),           // "deposit" | "withdrawal" | "transfer"
     status: v.string(),         // "pending" | "completed" | "failed"
     description: v.string(),
-    metadata: v.optional(v.any()), // Additional data like recipient username
+    metadata: v.optional(v.any()), // Additional data like recipient username, exchange rates
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   }).index("by_from_user", ["fromUserId"])
@@ -44,14 +82,17 @@ export default defineSchema({
     .index("by_created", ["createdAt"])
     .index("by_currency", ["currency"]),
 
-  // ✅ Extended user profiles (temporarily include old wallet fields for migration)
+  // ✅ Enhanced user profiles with phone detection and PIN security
   profiles: defineTable({
     userId: v.id("users"),
     username: v.string(),
     name: v.optional(v.string()),
     bio: v.optional(v.string()),
     avatar: v.optional(v.string()), // storage id
-    phoneNumber: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()), // Required for country detection
+    phoneCountryCode: v.optional(v.string()), // Extracted from phone (+234, +1, etc.)
+    detectedCountry: v.optional(v.string()), // Country code from phone (NG, US, etc.)
+    pinHash: v.optional(v.string()), // Bcrypt hashed PIN for withdrawals
     interests: v.optional(v.array(v.string())), // Health-related interests
     // TEMPORARY: Old wallet fields - remove after migration
     walletAddress: v.optional(v.string()),
@@ -60,7 +101,10 @@ export default defineSchema({
     walletSeedEnc: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
-  }).index("by_username", ["username"]).index("by_userId", ["userId"]),
+  }).index("by_username", ["username"])
+    .index("by_userId", ["userId"])
+    .index("by_phone", ["phoneNumber"])
+    .index("by_country", ["detectedCountry"]),
 
   // ✅ Articles table
   articles: defineTable({

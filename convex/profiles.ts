@@ -15,14 +15,18 @@ export const checkUsernameAvailability = query({
   },
 });
 
-// Create or update user profile (removed wallet fields)
+// Create or update user profile with multi-currency support
 export const createOrUpdateProfile = mutation({
   args: {
     username: v.string(),
     name: v.optional(v.string()),
     bio: v.optional(v.string()),
     avatar: v.optional(v.string()),
-    phoneNumber: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()), // Now optional for backward compatibility
+    phoneCountryCode: v.optional(v.string()),
+    detectedCountry: v.optional(v.string()),
+    pinHash: v.optional(v.string()),
+    primaryCurrency: v.optional(v.string()),
     interests: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -32,7 +36,7 @@ export const createOrUpdateProfile = mutation({
       throw new Error("Not authenticated");
     }
 
-    console.log('createOrUpdateProfile called:', { userId, args });
+    console.log('createOrUpdateProfile called:', { userId, args: { ...args, pinHash: args.pinHash ? '[REDACTED]' : undefined } });
 
     try {
       // Check if username is already taken by another user
@@ -71,29 +75,46 @@ export const createOrUpdateProfile = mutation({
         if (args.bio !== undefined) updateData.bio = args.bio;
         if (args.avatar !== undefined) updateData.avatar = args.avatar;
         if (args.phoneNumber !== undefined) updateData.phoneNumber = args.phoneNumber;
+        if (args.phoneCountryCode !== undefined) updateData.phoneCountryCode = args.phoneCountryCode;
+        if (args.detectedCountry !== undefined) updateData.detectedCountry = args.detectedCountry;
+        if (args.pinHash !== undefined) updateData.pinHash = args.pinHash;
+        if (args.primaryCurrency !== undefined) updateData.primaryCurrency = args.primaryCurrency;
         if (args.interests !== undefined) updateData.interests = args.interests;
         
         await ctx.db.patch(userProfile._id, updateData);
         console.log('Profile updated successfully');
+
+        // Create or update wallet with multi-currency support
+        await createOrUpdateMultiCurrencyWallet(ctx, userId, args.primaryCurrency || 'USD', !!args.phoneCountryCode);
+
         return userProfile._id;
       } else {
         // Create new profile
         console.log('Creating new profile for user:', userId);
-        const profileData = {
+        const profileData: any = {
           userId,
           username: args.username.toLowerCase(),
-          name: args.name,
-          bio: args.bio,
-          avatar: args.avatar,
-          phoneNumber: args.phoneNumber,
-          interests: args.interests,
           createdAt: Date.now(),
         };
-        console.log('Profile data to insert:', profileData);
+        
+        // Only include fields that are provided
+        if (args.name !== undefined) profileData.name = args.name;
+        if (args.bio !== undefined) profileData.bio = args.bio;
+        if (args.avatar !== undefined) profileData.avatar = args.avatar;
+        if (args.phoneNumber !== undefined) profileData.phoneNumber = args.phoneNumber;
+        if (args.phoneCountryCode !== undefined) profileData.phoneCountryCode = args.phoneCountryCode;
+        if (args.detectedCountry !== undefined) profileData.detectedCountry = args.detectedCountry;
+        if (args.pinHash !== undefined) profileData.pinHash = args.pinHash;
+        if (args.interests !== undefined) profileData.interests = args.interests;
+        
+        console.log('Profile data to insert:', { ...profileData, pinHash: profileData.pinHash ? '[REDACTED]' : undefined });
 
         const profileId = await ctx.db.insert("profiles", profileData);
         console.log('Profile created successfully:', profileId);
         
+        // Create multi-currency wallet
+        await createOrUpdateMultiCurrencyWallet(ctx, userId, args.primaryCurrency || 'USD', !!args.phoneCountryCode);
+
         return profileId;
       }
     } catch (error) {
@@ -102,6 +123,74 @@ export const createOrUpdateProfile = mutation({
     }
   },
 });
+
+// Helper function to create or update multi-currency wallet
+async function createOrUpdateMultiCurrencyWallet(
+  ctx: any, 
+  userId: string, 
+  primaryCurrency: string, 
+  phoneCountryDetected: boolean
+) {
+  console.log('Creating/updating multi-currency wallet for user:', userId);
+
+  // Check if wallet already exists
+  const existingWallet = await ctx.db
+    .query("wallets")
+    .withIndex("userId", (q: any) => q.eq("userId", userId))
+    .first();
+
+  const balances = {
+    USD: 0,
+    NGN: 0,
+    GBP: 0,
+    EUR: 0,
+    CAD: 0,
+    GHS: 0,
+    KES: 0,
+    GMD: 0,
+    ZAR: 0
+  };
+
+  if (existingWallet) {
+    // Update existing wallet to multi-currency structure if needed
+    console.log('Updating existing wallet:', existingWallet._id);
+    
+    // Preserve existing balances if they exist in old format
+    if ((existingWallet as any).balanceUSD !== undefined) {
+      balances.USD = (existingWallet as any).balanceUSD || 0;
+    }
+    if ((existingWallet as any).balanceNGN !== undefined) {
+      balances.NGN = (existingWallet as any).balanceNGN || 0;
+    }
+    
+    // If wallet already has new structure, preserve those balances
+    if ((existingWallet as any).balances) {
+      Object.assign(balances, (existingWallet as any).balances);
+    }
+
+    await ctx.db.patch(existingWallet._id, {
+      primaryCurrency,
+      phoneCountryDetected,
+      balances,
+      updatedAt: Date.now()
+    });
+    
+    console.log('Wallet updated successfully');
+  } else {
+    // Create new multi-currency wallet
+    console.log('Creating new multi-currency wallet');
+    
+    const walletId = await ctx.db.insert("wallets", {
+      userId,
+      primaryCurrency,
+      phoneCountryDetected,
+      balances,
+      createdAt: Date.now()
+    });
+    
+    console.log('Multi-currency wallet created successfully:', walletId);
+  }
+}
 
 // Get user profile by username
 export const getProfileByUsername = query({

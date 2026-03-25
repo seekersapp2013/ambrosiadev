@@ -11,7 +11,39 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    exclude: [
+      'livekit-server-sdk',
+      'aws-sdk',
+      'mock-aws-s3',
+      'nock',
+      '@mapbox/node-pre-gyp',
+      'bcrypt'
+    ],
+    include: ['livekit-client'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      external: [
+        'aws-sdk',
+        'mock-aws-s3', 
+        'nock',
+        'livekit-server-sdk',
+        '@mapbox/node-pre-gyp',
+        'bcrypt',
+        'path',
+        'crypto'
+      ]
+    }
+  },
   server: {
     host: true,
     allowedHosts: ['app.ambrosia.africa', 'dev.ambrosia.africa', 'localhost'],

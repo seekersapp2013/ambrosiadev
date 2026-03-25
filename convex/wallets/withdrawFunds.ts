@@ -6,7 +6,7 @@ import { internal } from "../_generated/api";
 export const withdrawFunds = mutation({
   args: {
     amount: v.number(),
-    currency: v.string(), // "USD" or "NGN"
+    currency: v.string(), // Only "NGN" allowed for withdrawals
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -18,8 +18,9 @@ export const withdrawFunds = mutation({
       throw new Error("Amount must be greater than 0");
     }
 
-    if (!["USD", "NGN"].includes(args.currency)) {
-      throw new Error("Currency must be USD or NGN");
+    // Only NGN withdrawals allowed
+    if (args.currency !== "NGN") {
+      throw new Error("Withdrawals are only supported in NGN");
     }
 
     // Get wallet
@@ -32,7 +33,7 @@ export const withdrawFunds = mutation({
       throw new Error("Wallet not found");
     }
 
-    const currentBalance = args.currency === "USD" ? wallet.balanceUSD : wallet.balanceNGN;
+    const currentBalance = wallet.balances.NGN;
 
     if (currentBalance < args.amount) {
       throw new Error("Insufficient balance");
@@ -54,15 +55,16 @@ export const withdrawFunds = mutation({
       completedAt: Date.now(),
     });
 
-    // Update wallet balance based on currency
-    const updateData: any = { updatedAt: Date.now() };
-    if (args.currency === "USD") {
-      updateData.balanceUSD = wallet.balanceUSD - args.amount;
-    } else {
-      updateData.balanceNGN = wallet.balanceNGN - args.amount;
-    }
+    // Update wallet balance for NGN
+    const newBalances = {
+      ...wallet.balances,
+      NGN: wallet.balances.NGN - args.amount
+    };
 
-    await ctx.db.patch(wallet._id, updateData);
+    await ctx.db.patch(wallet._id, {
+      balances: newBalances,
+      updatedAt: Date.now()
+    });
 
     // Send notification
     await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {

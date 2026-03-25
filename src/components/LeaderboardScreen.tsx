@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { WalletBalance } from "./WalletBalance";
 import { GenerateWallet } from "./GenerateWallet";
 import { SendEmailForm } from "./SendEmailForm";
-import { TransferFunds } from "./TransferFunds";
+import { Transfer } from "./Transfer";
 import { EmailHistory } from "./EmailHistory";
 
 export function LeaderboardScreen() {
@@ -149,7 +149,7 @@ export function LeaderboardScreen() {
         <WalletBalance />
         <GenerateWallet />
         <SendEmailForm />
-        <TransferFunds />
+        <Transfer onBack={() => {}} />
         <EmailHistory />
       </div>
       </div>

@@ -425,8 +425,9 @@ body {
 
 .prose br {
   line-height: 1.7;
-}/
-* Enhanced responsive utilities for booking system */
+}
+
+/* Enhanced responsive utilities for booking system */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
