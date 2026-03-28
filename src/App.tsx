@@ -40,7 +40,7 @@ import { GenerateWallet } from "./components/GenerateWallet";
 import { EmailHistory } from "./components/EmailHistory";
 import { NotificationManager } from "./components/NotificationManager";
 import { ChatScreen } from "./components/ChatScreen";
-import { UserProfileView } from "./components/UserProfileView";
+import { PaymentCallback } from "./components/PaymentCallback";
 
 // Main App Component
 function MainApp() {
@@ -56,6 +56,14 @@ function MainApp() {
   
   // Get unread notification count
   const unreadCount = useQuery(api.notifications.getUnreadCount);
+
+  // Handle URL-based routing for callback
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/callback') {
+      setCurrentScreen('payment-callback');
+    }
+  }, []);
 
   const showScreen = (screenId: string, data?: any) => {
     console.log('showScreen called:', { screenId, data });
@@ -147,6 +155,8 @@ function MainApp() {
         return <GenerateWallet />;
       case 'email-history':
         return <EmailHistory />;
+      case 'payment-callback':
+        return <PaymentCallback />;
 
       default:
         return <StreamScreen onNavigate={showScreen} />;

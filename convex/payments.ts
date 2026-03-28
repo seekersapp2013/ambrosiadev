@@ -403,3 +403,78 @@ export const getCreatorEarnings = query({
     };
   },
 });
+
+// Create payment intent for ErcasPay
+export const createPaymentIntent = mutation({
+  args: {
+    userId: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    reference: v.string(),
+    paymentReference: v.string(),
+    provider: v.string(),
+    status: v.string(),
+    customerEmail: v.string(),
+    customerName: v.string(),
+    customerPhone: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const paymentIntentId = await ctx.db.insert("paymentIntents", {
+      userId: args.userId,
+      amount: args.amount,
+      currency: args.currency,
+      reference: args.reference,
+      paymentReference: args.paymentReference,
+      provider: args.provider,
+      status: args.status,
+      customerEmail: args.customerEmail,
+      customerName: args.customerName,
+      customerPhone: args.customerPhone,
+      createdAt: Date.now(),
+    });
+
+    return paymentIntentId;
+  },
+});
+
+// Get payment intent by reference
+export const getPaymentIntentByReference = query({
+  args: {
+    reference: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const paymentIntent = await ctx.db
+      .query("paymentIntents")
+      .withIndex("by_reference", (q) => q.eq("reference", args.reference))
+      .first();
+
+    return paymentIntent;
+  },
+});
+
+// Update payment status
+export const updatePaymentStatus = mutation({
+  args: {
+    reference: v.string(),
+    status: v.string(),
+    ercasPayData: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const paymentIntent = await ctx.db
+      .query("paymentIntents")
+      .withIndex("by_reference", (q) => q.eq("reference", args.reference))
+      .first();
+
+    if (!paymentIntent) {
+      throw new Error("Payment intent not found");
+    }
+
+    await ctx.db.patch(paymentIntent._id, {
+      status: args.status,
+      ercasPayData: args.ercasPayData,
+      updatedAt: Date.now(),
+    });
+
+    return paymentIntent._id;
+  },
+});

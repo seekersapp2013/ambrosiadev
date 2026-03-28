@@ -1,0 +1,30 @@
+curl --location 'https://api.ercaspay.com/api/v1/payment/initiate' \
+--header 'Accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer ECRS-LIVE-SKSIl7IVtWr0hniZEr1SNb3H8s1fsL02HnMWvdS7Fp' \
+--data-raw '{
+    "amount": 100,
+    "paymentReference": "some data",
+    "paymentMethods": "card,bank-transfer,ussd,qrcode",
+    "customerName": "Babalola Tobi",
+    "customerEmail": "graderng@gmail.com",
+    "customerPhoneNumber": "08121303854",
+    "redirectUrl": "https://yourwebsite.com/callback",
+    "description": "Payment description",
+    "currency": "NGN",
+    "feeBearer": "customer"
+}'
+
+
+response
+
+{
+  "requestSuccessful": true,
+  "responseCode": "success",
+  "responseMessage": "success",
+  "responseBody": {
+    "paymentReference": "some data",
+    "transactionReference": "ER|A16450CDD12B4",
+    "checkoutUrl": "http:\/\/checkout.ercaspay.com\/ER|A16450CDD12B4"
+  }
+}

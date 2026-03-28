@@ -22,6 +22,9 @@ import type * as cron from "../cron.js";
 import type * as emailTemplates from "../emailTemplates.js";
 import type * as emails from "../emails.js";
 import type * as engagement from "../engagement.js";
+import type * as ercasPayActions from "../ercasPayActions.js";
+import type * as ercasPayMutations from "../ercasPayMutations.js";
+import type * as ercaspay from "../ercaspay.js";
 import type * as events from "../events.js";
 import type * as feed from "../feed.js";
 import type * as files from "../files.js";
@@ -37,6 +40,7 @@ import type * as migrations_removeSellerAddress from "../migrations/removeSeller
 import type * as notificationAnalytics from "../notificationAnalytics.js";
 import type * as notifications from "../notifications.js";
 import type * as payments from "../payments.js";
+import type * as profileQueries from "../profileQueries.js";
 import type * as profiles from "../profiles.js";
 import type * as reels from "../reels.js";
 import type * as scheduledJobs from "../scheduledJobs.js";
@@ -76,6 +80,9 @@ declare const fullApi: ApiFromModules<{
   emailTemplates: typeof emailTemplates;
   emails: typeof emails;
   engagement: typeof engagement;
+  ercasPayActions: typeof ercasPayActions;
+  ercasPayMutations: typeof ercasPayMutations;
+  ercaspay: typeof ercaspay;
   events: typeof events;
   feed: typeof feed;
   files: typeof files;
@@ -91,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   notificationAnalytics: typeof notificationAnalytics;
   notifications: typeof notifications;
   payments: typeof payments;
+  profileQueries: typeof profileQueries;
   profiles: typeof profiles;
   reels: typeof reels;
   scheduledJobs: typeof scheduledJobs;

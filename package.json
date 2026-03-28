@@ -17,7 +17,7 @@
     "@convex-dev/resend": "^0.1.7",
     "@tinymce/tinymce-react": "^6.3.0",
     "@xyflow/react": "^12.8.3",
-    "axios": "^1.11.0",
+    "axios": "^1.14.0",
     "convex": "^1.23.0",
     "convex-helpers": "^0.1.114",
     "cors": "^2.8.5",

@@ -72,6 +72,10 @@ export default defineSchema({
     type: v.string(),           // "deposit" | "withdrawal" | "transfer"
     status: v.string(),         // "pending" | "completed" | "failed"
     description: v.string(),
+    paymentGateway: v.optional(v.string()), // "direct" | "ercaspay"
+    externalTransactionId: v.optional(v.string()), // ErcasPay transaction reference
+    paymentUrl: v.optional(v.string()), // ErcasPay checkout URL
+    webhookData: v.optional(v.any()), // Webhook response data
     metadata: v.optional(v.any()), // Additional data like recipient username, exchange rates
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
@@ -80,7 +84,9 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"])
-    .index("by_currency", ["currency"]),
+    .index("by_currency", ["currency"])
+    .index("by_external_id", ["externalTransactionId"])
+    .index("by_payment_gateway", ["paymentGateway"]),
 
   // ✅ Enhanced user profiles with phone detection and PIN security
   profiles: defineTable({
@@ -218,6 +224,46 @@ export default defineSchema({
     transactionId: v.string(), // Reference to internal transaction
     createdAt: v.number()
   }).index("by_content", ["contentType", "contentId"]).index("by_payer", ["payerId"]).index("by_token", ["token"]).index("by_user_content", ["payerId", "contentType", "contentId"]).index("by_transaction", ["transactionId"]),
+
+  // ✅ Payment Intents for ErcasPay integration
+  paymentIntents: defineTable({
+    userId: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    reference: v.string(), // ErcasPay transaction reference
+    paymentReference: v.string(), // ErcasPay payment reference
+    provider: v.string(), // "ercaspay"
+    status: v.string(), // "pending" | "success" | "failed"
+    customerEmail: v.string(),
+    customerName: v.string(),
+    customerPhone: v.optional(v.string()),
+    ercasPayData: v.optional(v.any()), // ErcasPay response data
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_reference", ["reference"])
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_provider", ["provider"]),
+
+  // ✅ ErcasPay Transactions for tracking payment flow
+  ercasPayTransactions: defineTable({
+    id: v.string(), // Internal transaction ID
+    userId: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    paymentReference: v.string(),
+    externalTransactionId: v.optional(v.string()), // ErcasPay transaction reference
+    paymentUrl: v.optional(v.string()), // ErcasPay checkout URL
+    status: v.string(), // "pending" | "completed" | "failed"
+    webhookData: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number())
+  }).index("by_transaction_id", ["id"])
+    .index("by_user", ["userId"])
+    .index("by_external_id", ["externalTransactionId"])
+    .index("by_status", ["status"])
+    .index("by_payment_reference", ["paymentReference"]),
 
   // ✅ Enhanced Notifications table
   notifications: defineTable({
