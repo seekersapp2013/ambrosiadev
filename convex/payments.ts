@@ -4,7 +4,12 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
 import { api, internal } from "./_generated/api";
 
-// Purchase content using internal wallet transfer
+// TODO: When admin role is created, allow admins to set custom revenue splits per user
+// Default revenue split: 70% to creator, 30% to platform
+const DEFAULT_CREATOR_SHARE = 0.70;
+const DEFAULT_PLATFORM_SHARE = 0.30;
+
+// Purchase content using internal wallet transfer with multi-currency support
 export const purchaseContent = mutation({
   args: {
     contentType: v.string(), // 'article' | 'reel'
@@ -77,17 +82,28 @@ export const purchaseContent = mutation({
       throw new Error("Buyer wallet not found");
     }
 
-    // For now, we'll use USD for content purchases
-    const currency = "USD";
-    const buyerBalance = buyerWallet.balances.USD;
+    // Multi-currency payment logic
+    const contentCurrency = args.priceToken;
+    const contentPrice = args.priceAmount;
 
-    if (buyerBalance < args.priceAmount) {
-      throw new Error("Insufficient balance");
+    // Check if buyer has sufficient balance in the content currency
+    const buyerBalance = buyerWallet.balances[contentCurrency as keyof typeof buyerWallet.balances];
+    
+    if (buyerBalance === undefined) {
+      throw new Error(`Currency ${contentCurrency} not supported`);
     }
 
-    // Calculate platform fee (2%)
-    const platformFee = args.priceAmount * 0.02;
-    const sellerAmount = args.priceAmount - platformFee;
+    if (buyerBalance < contentPrice) {
+      // TODO: Implement cross-currency conversion using exchange rates
+      throw new Error(`Insufficient ${contentCurrency} balance. Required: ${contentPrice}, Available: ${buyerBalance}`);
+    }
+
+    // Calculate revenue split (70% creator, 30% platform)
+    // TODO: When admin role is implemented, fetch custom split for this creator from admin settings
+    const creatorAmount = contentPrice * DEFAULT_CREATOR_SHARE;
+    const platformAmount = contentPrice * DEFAULT_PLATFORM_SHARE;
+
+    console.log(`Revenue split for ${contentPrice} ${contentCurrency}: Creator: ${creatorAmount}, Platform: ${platformAmount}`);
 
     // Get or create seller wallet
     let sellerWallet = await ctx.db
@@ -98,7 +114,7 @@ export const purchaseContent = mutation({
     if (!sellerWallet) {
       const walletId = await ctx.db.insert("wallets", {
         userId: contentAuthorId,
-        primaryCurrency: "USD", // Default primary currency
+        primaryCurrency: contentCurrency, // Use content currency as default
         phoneCountryDetected: false,
         balances: {
           USD: 0, NGN: 0, GBP: 0, EUR: 0,
@@ -115,64 +131,68 @@ export const purchaseContent = mutation({
     // Generate unique transaction ID
     const transactionId = `cnt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create transaction record for content purchase
+    // Create transaction record for content purchase (buyer to creator)
     await ctx.db.insert("transactions", {
       id: transactionId,
       fromUserId: userId,
       toUserId: contentAuthorId,
-      amount: sellerAmount,
-      currency: currency,
+      amount: creatorAmount,
+      currency: contentCurrency,
       type: "transfer",
       status: "completed",
       description: `Purchase of ${args.contentType}: ${content.title || content.caption || 'Untitled'}`,
       metadata: {
         contentType: args.contentType,
         contentId: args.contentId,
-        platformFee,
-        originalAmount: args.priceAmount,
+        platformFee: platformAmount,
+        originalAmount: contentPrice,
+        revenueSplit: `${DEFAULT_CREATOR_SHARE * 100}% creator, ${DEFAULT_PLATFORM_SHARE * 100}% platform`,
       },
       createdAt: Date.now(),
       completedAt: Date.now(),
     });
 
-    // Create platform fee transaction if applicable
-    if (platformFee > 0) {
-      const feeTransactionId = `fee_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      await ctx.db.insert("transactions", {
-        id: feeTransactionId,
-        fromUserId: userId,
-        amount: platformFee,
-        currency: currency,
-        type: "transfer",
-        status: "completed",
-        description: `Platform fee for ${args.contentType} purchase`,
-        metadata: {
-          contentType: args.contentType,
-          contentId: args.contentId,
-          relatedTransactionId: transactionId,
-        },
-        createdAt: Date.now(),
-        completedAt: Date.now(),
-      });
-    }
-
-    // Update buyer balance
-    const newBuyerBalances = { ...buyerWallet.balances };
-    newBuyerBalances.USD -= args.priceAmount;
-    await ctx.db.patch(buyerWallet._id, {
-      balances: newBuyerBalances,
-      updatedAt: Date.now(),
+    // Create platform fee transaction record
+    const platformTransactionId = `plf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    await ctx.db.insert("transactions", {
+      id: platformTransactionId,
+      fromUserId: userId,
+      toUserId: undefined, // Platform fee has no specific recipient
+      amount: platformAmount,
+      currency: contentCurrency,
+      type: "platform_fee",
+      status: "completed",
+      description: `Platform fee for ${args.contentType} purchase`,
+      metadata: {
+        contentType: args.contentType,
+        contentId: args.contentId,
+        originalTransactionId: transactionId,
+      },
+      createdAt: Date.now(),
+      completedAt: Date.now(),
     });
 
-    // Update seller balance
-    if (!sellerWallet) {
-      throw new Error("Seller wallet not found");
-    }
-    const newSellerBalances = { ...sellerWallet.balances };
-    newSellerBalances.USD += sellerAmount;
+    // Update buyer wallet balance (deduct full amount)
+    const newBuyerBalances = {
+      ...buyerWallet.balances,
+      [contentCurrency]: buyerBalance - contentPrice
+    };
+
+    await ctx.db.patch(buyerWallet._id, {
+      balances: newBuyerBalances,
+      updatedAt: Date.now()
+    });
+
+    // Update seller wallet balance (add creator amount only)
+    const currentSellerBalance = sellerWallet.balances[contentCurrency as keyof typeof sellerWallet.balances];
+    const newSellerBalances = {
+      ...sellerWallet.balances,
+      [contentCurrency]: currentSellerBalance + creatorAmount
+    };
+
     await ctx.db.patch(sellerWallet._id, {
       balances: newSellerBalances,
-      updatedAt: Date.now(),
+      updatedAt: Date.now()
     });
 
     // Record the payment for access control
@@ -188,20 +208,29 @@ export const purchaseContent = mutation({
 
     // Send notifications
     await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {
-      type: 'CONTENT_PAYMENT',
+      type: 'CONTENT_PURCHASED',
       recipientUserId: contentAuthorId,
       actorUserId: userId,
       relatedContentType: args.contentType,
       relatedContentId: args.contentId,
       metadata: {
-        amount: sellerAmount.toString(),
-        token: args.priceToken,
-        transactionId,
-        platformFee: platformFee.toString(),
-      },
+        buyerName: buyerWallet.userId,
+        contentType: args.contentType,
+        contentTitle: content.title || content.caption || 'Untitled',
+        amount: creatorAmount.toString(),
+        currency: contentCurrency,
+        platformFee: platformAmount.toString(),
+      }
     });
 
-    return paymentId;
+    return {
+      success: true,
+      paymentId,
+      transactionId,
+      creatorAmount,
+      platformAmount,
+      currency: contentCurrency,
+    };
   },
 });
 

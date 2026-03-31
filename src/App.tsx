@@ -41,6 +41,7 @@ import { EmailHistory } from "./components/EmailHistory";
 import { NotificationManager } from "./components/NotificationManager";
 import { ChatScreen } from "./components/ChatScreen";
 import { PaymentCallback } from "./components/PaymentCallback";
+import { UserProfileView } from "./components/UserProfileView";
 
 // Main App Component
 function MainApp() {
@@ -88,7 +89,7 @@ function MainApp() {
       case 'user-profile-view':
         return <UserProfileView
           username={currentScreenData?.username}
-          onStartChat={(conversationId) => {
+          onStartChat={(conversationId: string) => {
             showScreen('chat-screen');
           }}
         />;

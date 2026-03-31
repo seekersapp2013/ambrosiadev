@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { SUPPORTED_CURRENCIES } from "../utils/currencyConfig";
 
 // Unified Payment Configuration Component
 interface PaymentConfigProps {
@@ -9,6 +10,8 @@ interface PaymentConfigProps {
   setIsGated: (value: boolean) => void;
   priceAmount: number;
   setPriceAmount: (value: number) => void;
+  priceCurrency: string;
+  setPriceCurrency: (value: string) => void;
   contentType: "article" | "reel";
 }
 
@@ -17,9 +20,14 @@ export function PaymentConfig({
   setIsGated,
   priceAmount,
   setPriceAmount,
+  priceCurrency,
+  setPriceCurrency,
   contentType
 }: PaymentConfigProps) {
-  const myProfile = useQuery(api.profiles.getMyProfile);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
+
+  // Get user's primary currency as default
+  const defaultCurrency = walletBalance?.primaryCurrency || "USD";
 
   return (
     <div className="space-y-3 pt-4 border-t border-gray-200">
@@ -48,11 +56,26 @@ export function PaymentConfig({
               onChange={(e) => setPriceAmount(parseFloat(e.target.value) || 1)}
               className="w-20 text-sm border border-gray-300 rounded px-2 py-1"
             />
-            <span className="text-sm text-gray-600">USD tokens</span>
+            <select
+              value={priceCurrency}
+              onChange={(e) => setPriceCurrency(e.target.value)}
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+            >
+              {Object.values(SUPPORTED_CURRENCIES).map((currency) => (
+                <option key={currency.code} value={currency.code}>
+                  {currency.flag} {currency.code}
+                </option>
+              ))}
+            </select>
           </div>
           <p className="text-xs text-gray-500">
             {contentType === "article" ? "Readers" : "Viewers"} will pay this amount to access your {contentType}
           </p>
+          {priceCurrency !== defaultCurrency && (
+            <p className="text-xs text-blue-600">
+              💡 Your primary currency is {SUPPORTED_CURRENCIES[defaultCurrency]?.flag} {defaultCurrency}
+            </p>
+          )}
         </div>
       )}
     </div>

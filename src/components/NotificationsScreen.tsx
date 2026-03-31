@@ -123,6 +123,16 @@ export function NotificationsScreen({ onBack, onOpenSettings, highlightNotificat
         return 'fas fa-at';
       case 'SYSTEM_ANNOUNCEMENT':
         return 'fas fa-bullhorn';
+      // Wallet notification types
+      case 'WALLET_DEPOSIT':
+        return 'fas fa-plus-circle';
+      case 'WALLET_WITHDRAWAL':
+        return 'fas fa-minus-circle';
+      case 'WALLET_TRANSFER_SENT':
+        return 'fas fa-arrow-up';
+      case 'WALLET_TRANSFER_RECEIVED':
+        return 'fas fa-arrow-down';
+      // Legacy notification types
       case 'email_sent':
         return 'fas fa-envelope';
       case 'wallet_created':

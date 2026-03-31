@@ -7,6 +7,7 @@ import {
   getCurrencyConfig,
   type CurrencyConfig
 } from '../utils/currencyConfig';
+import { UserSearchDropdown } from './UserSearchDropdown';
 
 interface TransferProps {
   onBack: () => void;
@@ -14,7 +15,7 @@ interface TransferProps {
 
 export function Transfer({ onBack }: TransferProps) {
   const [transferAmount, setTransferAmount] = useState("");
-  const [recipientUsername, setRecipientUsername] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedTransferCurrency, setSelectedTransferCurrency] = useState("USD");
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
@@ -25,14 +26,18 @@ export function Transfer({ onBack }: TransferProps) {
   // Get currency configurations
   const supportedCurrencies = getSupportedCurrencies();
 
+  const handleUserSelect = (user: any) => {
+    setSelectedUser(user);
+  };
+
   const handleTransfer = async () => {
     if (!transferAmount || parseFloat(transferAmount) <= 0) {
       setMessage("Please enter a valid amount");
       return;
     }
 
-    if (!recipientUsername.trim()) {
-      setMessage("Please enter a recipient username");
+    if (!selectedUser) {
+      setMessage("Please select a recipient from the search results");
       return;
     }
 
@@ -41,14 +46,14 @@ export function Transfer({ onBack }: TransferProps) {
 
     try {
       const result = await transferFunds({
-        recipientUsername: recipientUsername.trim(),
+        recipientUsername: selectedUser.username,
         amount: parseFloat(transferAmount),
         currency: selectedTransferCurrency,
-        description: `Transfer to @${recipientUsername.trim()}`,
+        description: `Transfer to @${selectedUser.username}`,
       });
-      setMessage(`Successfully sent ${formatCurrencyAmount(parseFloat(transferAmount), selectedTransferCurrency)} to @${recipientUsername}. New balance: ${formatCurrencyAmount(result.senderNewBalance, result.currency)}`);
+      setMessage(`Successfully sent ${formatCurrencyAmount(parseFloat(transferAmount), selectedTransferCurrency)} to @${selectedUser.username}. New balance: ${formatCurrencyAmount(result.senderNewBalance, result.currency)}`);
       setTransferAmount("");
-      setRecipientUsername("");
+      setSelectedUser(null);
     } catch (error) {
       setMessage(`Error: ${error instanceof Error ? error.message : "Transfer failed"}`);
     } finally {
@@ -75,19 +80,12 @@ export function Transfer({ onBack }: TransferProps) {
       {/* Transfer Form */}
       <section className="bg-white p-6 rounded-xl border border-gray-200">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Recipient Username
-            </label>
-            <input
-              type="text"
-              value={recipientUsername}
-              onChange={(e) => setRecipientUsername(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-              placeholder="@username"
-              disabled={isProcessing}
-            />
-          </div>
+          <UserSearchDropdown
+            onUserSelect={handleUserSelect}
+            label="Search & Select Recipient"
+            placeholder="Search by username or name..."
+            disabled={isProcessing}
+          />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Currency
@@ -130,7 +128,7 @@ export function Transfer({ onBack }: TransferProps) {
           </div>
           <button
             onClick={handleTransfer}
-            disabled={isProcessing || !transferAmount || !recipientUsername}
+            disabled={isProcessing || !transferAmount || !selectedUser}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? "Processing..." : `Transfer ${selectedTransferCurrency}`}

@@ -3,7 +3,6 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { 
   getDepositCurrencies, 
-  formatCurrencyAmount,
   getCurrencyConfig,
   type CurrencyConfig
 } from '../utils/currencyConfig';
@@ -15,18 +14,21 @@ interface DepositProps {
 export function Deposit({ onBack }: DepositProps) {
   const [depositAmount, setDepositAmount] = useState("");
   const [selectedDepositCurrency, setSelectedDepositCurrency] = useState("NGN");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [paymentMethods, setPaymentMethods] = useState("card,bank-transfer,ussd,qrcode");
+  const [description, setDescription] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // Hidden fields that will be auto-populated from profile
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhoneNumber, setCustomerPhoneNumber] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState(`${window.location.origin}/callback`);
-  const [description, setDescription] = useState("");
-  const [feeBearer, setFeeBearer] = useState("customer");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [message, setMessage] = useState("");
-  const [ercasPayResponse, setErcasPayResponse] = useState<any>(null);
+  const [paymentReference, setPaymentReference] = useState("");
+  const redirectUrl = `${window.location.origin}/callback`;
+  const paymentMethods = "card,bank-transfer,ussd,qrcode";
+  const feeBearer = "customer";
 
+  // Fetch current user profile
+  const userProfile = useQuery(api.profiles.getMyProfile);
   const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, { currency: "USD" });
   const initializePayment = useAction(api.ercasPayActions.initializeDepositPayment);
 
@@ -40,6 +42,38 @@ export function Deposit({ onBack }: DepositProps) {
     }
   }, [walletBalance?.primaryCurrency]);
 
+  // Auto-populate hidden fields from user profile
+  useEffect(() => {
+    if (userProfile) {
+      // Set customer name from profile
+      setCustomerName(userProfile.name || userProfile.user?.name || "");
+      
+      // Set customer email from user data
+      setCustomerEmail(userProfile.user?.email || "");
+      
+      // Set customer phone number from profile or user data
+      setCustomerPhoneNumber((userProfile as any).phoneNumber || userProfile.user?.phone || "");
+    }
+  }, [userProfile]);
+
+  // Generate payment reference when amount changes
+  useEffect(() => {
+    if (depositAmount && parseFloat(depositAmount) > 0) {
+      const now = new Date();
+      const dateTime = now.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/[^\w]/g, '');
+      
+      setPaymentReference(`Payment of ${depositAmount} ${selectedDepositCurrency} ${dateTime}`);
+    }
+  }, [depositAmount, selectedDepositCurrency]);
+
   const handleDeposit = async () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       setMessage("Please enter a valid amount");
@@ -47,13 +81,12 @@ export function Deposit({ onBack }: DepositProps) {
     }
 
     if (!customerName || !customerEmail || !customerPhoneNumber) {
-      setMessage("Please fill in all required customer information");
+      setMessage("Profile information is incomplete. Please update your profile first.");
       return;
     }
 
     setIsProcessing(true);
     setMessage("");
-    setErcasPayResponse(null);
 
     try {
       // Call backend action to initialize payment
@@ -64,18 +97,15 @@ export function Deposit({ onBack }: DepositProps) {
         customerEmail,
         customerPhone: customerPhoneNumber,
         paymentMethods,
-        description: description || `Deposit ${formatCurrencyAmount(parseFloat(depositAmount), selectedDepositCurrency)}`,
+        description: description || paymentReference,
         feeBearer,
         redirectUrl
       });
-      
-      // Store the ErcasPay response for display
-      setErcasPayResponse(ercasPayResult);
 
       if (ercasPayResult.requestSuccessful) {
         setMessage(`Payment initiated successfully! Transaction Reference: ${ercasPayResult.responseBody.transactionReference}`);
         
-        // Open payment URL in a popup window instead of new tab
+        // Open payment URL in a popup window
         if (ercasPayResult.responseBody.checkoutUrl) {
           const popup = window.open(
             ercasPayResult.responseBody.checkoutUrl,
@@ -94,7 +124,6 @@ export function Deposit({ onBack }: DepositProps) {
                 setMessage('Payment completed successfully! Your wallet has been updated.');
                 // Clear form on success
                 setDepositAmount("");
-                setPaymentReference("");
                 setDescription("");
               } else {
                 setMessage(`Payment ${event.data.status}. Please check your wallet balance.`);
@@ -115,14 +144,12 @@ export function Deposit({ onBack }: DepositProps) {
             if (popup && popup.closed) {
               clearInterval(checkClosed);
               window.removeEventListener('message', handleMessage);
-              setMessage('Payment window was closed. Please check your wallet balance to confirm payment status.');
             }
           }, 1000);
         }
         
         // Clear form on success
         setDepositAmount("");
-        setPaymentReference("");
         setDescription("");
       } else {
         setMessage(`Payment initiation failed: ${ercasPayResult.responseMessage}`);
@@ -159,7 +186,7 @@ export function Deposit({ onBack }: DepositProps) {
           <div className="border-b border-gray-200 pb-4 mb-4">
             <h3 className="text-lg font-medium text-gray-900 mb-3">Customer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+             <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Full Name *
                 </label>
@@ -174,7 +201,7 @@ export function Deposit({ onBack }: DepositProps) {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
                 </label>
@@ -204,7 +231,7 @@ export function Deposit({ onBack }: DepositProps) {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Payment Reference
                 </label>
@@ -213,7 +240,7 @@ export function Deposit({ onBack }: DepositProps) {
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                  placeholder="Auto-generated if empty"
+                  placeholder="Auto-generated based on amount and date"
                   disabled={isProcessing}
                 />
               </div>
@@ -259,38 +286,34 @@ export function Deposit({ onBack }: DepositProps) {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Payment Methods
                 </label>
                 <select
                   value={paymentMethods}
-                  onChange={(e) => setPaymentMethods(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                  disabled={isProcessing}
+                  onChange={() => {}} // Read-only but displayed
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  disabled={true}
                 >
                   <option value="card,bank-transfer,ussd,qrcode">All Methods</option>
-                  <option value="card">Card Only</option>
-                  <option value="bank-transfer">Bank Transfer Only</option>
-                  <option value="ussd">USSD Only</option>
-                  <option value="qrcode">QR Code Only</option>
-                  <option value="card,bank-transfer">Card & Bank Transfer</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">Default: All available payment methods</p>
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Fee Bearer
                 </label>
                 <select
                   value={feeBearer}
-                  onChange={(e) => setFeeBearer(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                  disabled={isProcessing}
+                  onChange={() => {}} // Read-only but displayed
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  disabled={true}
                 >
                   <option value="customer">Customer</option>
-                  <option value="merchant">Merchant</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">Default: Customer pays fees</p>
               </div>
             </div>
           </div>
@@ -301,7 +324,7 @@ export function Deposit({ onBack }: DepositProps) {
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
+                  Description (Optional)
                 </label>
                 <textarea
                   value={description}
@@ -313,18 +336,18 @@ export function Deposit({ onBack }: DepositProps) {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Redirect URL
                 </label>
                 <input
                   type="url"
                   value={redirectUrl}
-                  onChange={(e) => setRedirectUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                  placeholder={`${window.location.origin}/callback`}
-                  disabled={isProcessing}
+                  onChange={() => {}} // Read-only but displayed
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  disabled={true}
                 />
+                <p className="text-xs text-gray-500 mt-1">Default callback URL for payment completion</p>
               </div>
             </div>
           </div>
@@ -347,33 +370,6 @@ export function Deposit({ onBack }: DepositProps) {
             : "bg-green-100 border border-green-300 text-green-700"
         }`}>
           <pre className="whitespace-pre-wrap text-sm">{message}</pre>
-        </div>
-      )}
-
-      {/* ErcasPay Response */}
-      {ercasPayResponse && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-blue-900 mb-3">ErcasPay Response</h3>
-          <div className="bg-white p-4 rounded border">
-            <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto">
-              {JSON.stringify(ercasPayResponse, null, 2)}
-            </pre>
-          </div>
-          
-          {/* Checkout URL Button */}
-          {ercasPayResponse?.requestSuccessful && ercasPayResponse?.responseBody?.checkoutUrl && (
-            <div className="mt-4">
-              <a
-                href={ercasPayResponse.responseBody.checkoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <i className="fas fa-external-link-alt mr-2"></i>
-                Complete Payment
-              </a>
-            </div>
-          )}
         </div>
       )}
     </div>

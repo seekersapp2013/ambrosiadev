@@ -13,6 +13,7 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
   const [tags, setTags] = useState("");
   const [isGated, setIsGated] = useState(false);
   const [priceAmount, setPriceAmount] = useState(1);
+  const [priceCurrency, setPriceCurrency] = useState("USD");
   const [isSensitive, setIsSensitive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -22,6 +23,14 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createReel = useMutation(api.reels.createReel);
   const myProfile = useQuery(api.profiles.getMyProfile);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+
+  // Set default currency to user's primary currency
+  useState(() => {
+    if (walletBalance?.primaryCurrency && priceCurrency === "USD") {
+      setPriceCurrency(walletBalance.primaryCurrency);
+    }
+  });
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,7 +66,7 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
         caption: caption.trim() || undefined,
         tags: tagsArray,
         isGated,
-        priceToken: isGated ? "USD" : undefined,
+        priceToken: isGated ? priceCurrency : undefined,
         priceAmount: isGated ? priceAmount : undefined,
         isSensitive,
       });
@@ -73,34 +82,24 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
   };
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <button onClick={onBack} className="text-gray-600">
-          <i className="fas fa-times text-xl"></i>
-        </button>
-        <h1 className="text-lg font-semibold">New Reel</h1>
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Create Reel</h1>
         <button
-          onClick={handleSubmit}
-          disabled={!videoFile || isSubmitting}
-          className={`px-4 py-2 rounded-lg font-medium ${
-            videoFile && !isSubmitting
-              ? 'bg-accent text-white'
-              : 'bg-gray-200 text-gray-400'
-          }`}
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-800"
         >
-          {isSubmitting ? 'Uploading...' : 'Share'}
+          <i className="fas fa-times text-xl"></i>
         </button>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Video Upload */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Video
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Video *
           </label>
-          
+
           {!videoPreview ? (
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -115,7 +114,7 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
               <video
                 src={videoPreview}
                 controls
-                className="w-full max-h-64 rounded-lg"
+                className="w-full max-h-96 rounded-lg"
               />
               <button
                 type="button"
@@ -189,8 +188,28 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
             setIsGated={setIsGated}
             priceAmount={priceAmount}
             setPriceAmount={setPriceAmount}
+            priceCurrency={priceCurrency}
+            setPriceCurrency={setPriceCurrency}
             contentType="reel"
           />
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex space-x-3 pt-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !videoFile}
+            className="flex-1 bg-accent text-white py-3 px-4 rounded-lg font-medium hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "Publishing..." : "Publish Reel"}
+          </button>
         </div>
       </form>
     </div>

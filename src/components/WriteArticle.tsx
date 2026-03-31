@@ -16,6 +16,7 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
   const [tags, setTags] = useState("");
   const [isGated, setIsGated] = useState(false);
   const [priceAmount, setPriceAmount] = useState(1);
+  const [priceCurrency, setPriceCurrency] = useState("USD");
   const [isSensitive, setIsSensitive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -24,6 +25,14 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
   const createArticle = useMutation(api.articles.createArticle);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const myProfile = useQuery(api.profiles.getMyProfile);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+
+  // Set default currency to user's primary currency
+  useState(() => {
+    if (walletBalance?.primaryCurrency && priceCurrency === "USD") {
+      setPriceCurrency(walletBalance.primaryCurrency);
+    }
+  });
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,7 +89,7 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
         coverImage: coverImageId,
         tags: tagsArray,
         isGated,
-        priceToken: isGated ? "USD" : undefined,
+        priceToken: isGated ? priceCurrency : undefined,
         priceAmount: isGated ? priceAmount : undefined,
         isSensitive,
       });
@@ -96,27 +105,18 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
   };
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <button onClick={onBack} className="text-gray-600">
-          <i className="fas fa-times text-xl"></i>
-        </button>
-        <h1 className="text-lg font-semibold">New Article</h1>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Write Article</h1>
         <button
-          onClick={handleSubmit}
-          disabled={!title.trim() || !content.trim() || isSubmitting}
-          className={`px-4 py-2 rounded-lg font-medium ${title.trim() && content.trim() && !isSubmitting
-            ? 'bg-accent text-white'
-            : 'bg-gray-200 text-gray-400'
-            }`}
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-800"
         >
-          {isSubmitting ? 'Publishing...' : 'Publish'}
+          <i className="fas fa-times text-xl"></i>
         </button>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title */}
         <div>
           <input
@@ -124,9 +124,12 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
             placeholder="Article title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-2xl font-bold placeholder-gray-400 border-none outline-none resize-none"
+            className="w-full text-2xl font-bold placeholder-gray-400 border-none outline-none"
             maxLength={100}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {title.length}/100 characters
+          </p>
         </div>
 
         {/* Subtitle */}
@@ -239,8 +242,28 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
             setIsGated={setIsGated}
             priceAmount={priceAmount}
             setPriceAmount={setPriceAmount}
+            priceCurrency={priceCurrency}
+            setPriceCurrency={setPriceCurrency}
             contentType="article"
           />
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex space-x-3 pt-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !title.trim() || !content.trim()}
+            className="flex-1 bg-accent text-white py-3 px-4 rounded-lg font-medium hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "Publishing..." : "Publish Article"}
+          </button>
         </div>
       </form>
     </div>

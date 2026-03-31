@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { api } from "./_generated/api";
 
 // Create pending transaction
@@ -89,6 +89,21 @@ export const getTransactionByExternalId = internalQuery({
     const transaction = await ctx.db
       .query("ercasPayTransactions")
       .withIndex("by_external_id", (q) => q.eq("externalTransactionId", args.externalTransactionId))
+      .first();
+
+    return transaction;
+  },
+});
+
+// Get transaction by payment reference
+export const getTransactionByPaymentReference = query({
+  args: {
+    paymentReference: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const transaction = await ctx.db
+      .query("ercasPayTransactions")
+      .withIndex("by_payment_reference", (q) => q.eq("paymentReference", args.paymentReference))
       .first();
 
     return transaction;
