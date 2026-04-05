@@ -12,6 +12,7 @@ export const createReel = mutation({
     caption: v.optional(v.string()),
     tags: v.array(v.string()),
     isSensitive: v.boolean(),
+    isPublic: v.boolean(), // New field for content visibility
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
     priceAmount: v.optional(v.number()),
@@ -28,6 +29,7 @@ export const createReel = mutation({
       caption: args.caption,
       tags: args.tags,
       isSensitive: args.isSensitive,
+      isPublic: args.isPublic, // Add the new field
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
@@ -108,7 +110,7 @@ export const getReelById = query({
   },
 });
 
-// List reels for feed
+// List reels for feed (only public reels)
 export const listReels = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
@@ -116,7 +118,12 @@ export const listReels = query({
 
     const reels = await ctx.db
       .query("reels")
+      .withIndex("by_created", (q) => q)
       .order("desc")
+      .filter((q) => q.or(
+        q.eq(q.field("isPublic"), true),
+        q.eq(q.field("isPublic"), undefined)
+      ))
       .take(limit);
 
     // Get author info for each reel
@@ -292,3 +299,42 @@ export const deleteReel = mutation({
   }
 });
 
+// List reels created by current user
+export const listMyReels = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const limit = args.limit || 20;
+
+    const reels = await ctx.db
+      .query("reels")
+      .withIndex("by_author", (q) => q.eq("authorId", userId))
+      .order("desc")
+      .take(limit);
+
+    // Get author info for each reel
+    const reelsWithAuthors = await Promise.all(
+      reels.map(async (reel) => {
+        const author = await ctx.db.get(reel.authorId);
+        const profile = await ctx.db
+          .query("profiles")
+          .filter((q) => q.eq(q.field("userId"), reel.authorId))
+          .first();
+
+        return {
+          ...reel,
+          author: {
+            id: author?._id,
+            name: author?.name || profile?.name,
+            username: profile?.username,
+            avatar: profile?.avatar,
+          },
+        };
+      })
+    );
+
+    return reelsWithAuthors;
+  },
+});

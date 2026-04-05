@@ -21,15 +21,27 @@ interface ArticleEngagementProps {
   disabled?: boolean; // For public viewer when not authenticated
   variant?: 'card' | 'viewer'; // Different layouts for different contexts
   hasAccess?: boolean; // Pass hasAccess from parent to avoid duplicate queries
+  courseContext?: {
+    courseId: Id<"courses">;
+    showProgressTracking?: boolean;
+  };
 }
 
-export function ArticleEngagement({ article, onNavigate, disabled = false, variant = 'viewer', hasAccess }: ArticleEngagementProps) {
+export function ArticleEngagement({ 
+  article, 
+  onNavigate, 
+  disabled = false, 
+  variant = 'viewer', 
+  hasAccess,
+  courseContext 
+}: ArticleEngagementProps) {
   const [showShare, setShowShare] = useState(false);
   const { isAuthenticated } = useConvexAuth();
   
   const clapArticle = useMutation(api.engagement.clapArticle);
   const bookmarkArticle = useMutation(api.engagement.bookmarkArticle);
   const startChat = useMutation(api.chat.startChatWithAuthor);
+  const markContentCompleted = useMutation(api.courseProgress.markContentCompleted);
   
   // Get like and bookmark status from database
   const myClaps = useQuery(api.engagement.myClapsForArticle, { articleId: article._id });
@@ -37,6 +49,16 @@ export function ArticleEngagement({ article, onNavigate, disabled = false, varia
     contentType: "article", 
     contentId: article._id 
   });
+
+  // Course progress tracking
+  const courseProgress = useQuery(
+    api.courseProgress.getCourseProgress,
+    courseContext ? { courseId: courseContext.courseId } : "skip"
+  );
+
+  const isContentCompleted = courseProgress?.completedContent.some(
+    completed => completed.contentId === article._id
+  ) || false;
 
   const handleClap = async (delta: number) => {
     try {
@@ -126,6 +148,21 @@ export function ArticleEngagement({ article, onNavigate, disabled = false, varia
       }
     } catch (error: any) {
       alert(error.message || 'Failed to start chat with author');
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    if (!courseContext || !isAuthenticated) return;
+    
+    try {
+      await markContentCompleted({
+        courseId: courseContext.courseId,
+        contentId: article._id,
+        timeSpent: 300, // 5 minutes default
+      });
+    } catch (error) {
+      console.error("Failed to mark article as completed:", error);
+      alert("Failed to mark as completed. Please try again.");
     }
   };
 
@@ -245,6 +282,25 @@ export function ArticleEngagement({ article, onNavigate, disabled = false, varia
           <i className={isBookmarked ? 'fas fa-bookmark' : 'far fa-bookmark'}></i>
         </button>
       </div>
+
+      {/* Course Progress Button */}
+      {courseContext?.showProgressTracking && courseProgress?.enrollment && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          {isContentCompleted ? (
+            <div className="flex items-center space-x-2 text-green-600">
+              <i className="fas fa-check-circle"></i>
+              <span className="text-sm font-medium">Completed</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleMarkComplete}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            >
+              Mark as Complete
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <ClapTotals articleId={article._id} />

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ReelEngagement } from "./ReelEngagement";
-import { GatedContentPaywall } from "./GatedContentPaywall";
+import { EnhancedPaywall } from "./EnhancedPaywall";
 
 interface PrivateReelViewerProps {
     reelId: string;
@@ -21,7 +21,7 @@ export function PrivateReelViewer({ reelId, onBack, onNavigate }: PrivateReelVie
     const reel = useQuery(api.reels.getReelById, { reelId: reelId as any });
 
     // Check if user has access to gated content
-    const hasAccess = useQuery(api.payments.hasAccess,
+    const hasAccess = useQuery(api.courseProgress.hasContentAccess,
         reel?._id ? {
             contentType: "reel",
             contentId: reel._id,
@@ -218,20 +218,15 @@ export function PrivateReelViewer({ reelId, onBack, onNavigate }: PrivateReelVie
                         {/* Gated Content Overlay */}
                         {reel.isGated && !hasAccess && (
                             <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">
-                                <div className="bg-white rounded-lg max-w-sm mx-4">
-                                    <GatedContentPaywall
-                                        contentType="reel"
-                                        contentId={reel._id}
-                                        title={reel.caption || 'Premium Reel'}
-                                        price={reel.priceAmount || 0}
-                                        token={reel.priceToken || "USD"}
-                                        sellerAddress={reel.sellerAddress}
-                                        onUnlock={() => {
-                                            // Content will automatically become accessible after payment
-                                        }}
-                                        onFundWallet={() => onNavigate?.('fund-wallet')}
-                                    />
-                                </div>
+                                <EnhancedPaywall
+                                    contentType="reel"
+                                    contentId={reel._id}
+                                    title={reel.caption || 'Premium Reel'}
+                                    onUnlock={() => {
+                                        // Content will automatically become accessible after payment
+                                    }}
+                                    onFundWallet={() => onNavigate?.('fund-wallet')}
+                                />
                             </div>
                         )}
 

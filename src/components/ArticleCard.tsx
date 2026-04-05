@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { ArticleEngagement } from "./ArticleEngagement";
+import { CourseIndicator } from "./CourseIndicator";
 
 interface ArticleCardProps {
   article: {
@@ -33,7 +34,7 @@ interface ArticleCardProps {
 export function ArticleCard({ article, onNavigate }: ArticleCardProps) {
   const [showSensitiveContent, setShowSensitiveContent] = useState(false);
 
-  const hasAccess = useQuery(api.payments.hasAccess, {
+  const hasAccess = useQuery(api.courseProgress.hasContentAccess, {
     contentType: "article",
     contentId: article._id,
   });
@@ -192,9 +193,18 @@ export function ArticleCard({ article, onNavigate }: ArticleCardProps) {
 
       {/* Clickable Article Content */}
       <div
-        className="px-4 cursor-pointer hover:bg-gray-50 transition-colors duration-200"
+        className="px-4 cursor-pointer hover:bg-gray-50 transition-colors duration-200 relative"
         onClick={handleReadArticle}
       >
+        {/* Course Indicator for articles without cover image */}
+        {!article.coverImage && (
+          <CourseIndicator 
+            contentType="article"
+            contentId={article._id}
+            onNavigate={onNavigate}
+          />
+        )}
+        
         <h2 className="text-lg font-bold mb-2">{article.title}</h2>
         {article.subtitle && (
           <p className="text-gray-600 mb-3">{article.subtitle}</p>
@@ -224,6 +234,13 @@ export function ArticleCard({ article, onNavigate }: ArticleCardProps) {
         {/* Cover Image */}
         {article.coverImage && (
           <div className="relative mb-3">
+            {/* Course Indicator */}
+            <CourseIndicator 
+              contentType="article"
+              contentId={article._id}
+              onNavigate={onNavigate}
+            />
+            
             {article.isSensitive && !showSensitiveContent ? (
               <div className="relative square-image">
                 <div className="absolute inset-0 graphic-content-warning flex flex-col items-center justify-center text-white p-4 text-center z-10">
@@ -270,7 +287,7 @@ export function ArticleCard({ article, onNavigate }: ArticleCardProps) {
               </span>
             </div>
             <p className="text-xs text-gray-600 mt-1">
-              Unlock this article to read the full content
+              Unlock this article to read the full content • May be part of a course
             </p>
           </div>
         )}

@@ -12,8 +12,8 @@ const DEFAULT_PLATFORM_SHARE = 0.30;
 // Purchase content using internal wallet transfer with multi-currency support
 export const purchaseContent = mutation({
   args: {
-    contentType: v.string(), // 'article' | 'reel'
-    contentId: v.union(v.id("articles"), v.id("reels")),
+    contentType: v.string(), // 'article' | 'reel' | 'course'
+    contentId: v.union(v.id("articles"), v.id("reels"), v.id("courses")),
     priceToken: v.string(),
     priceAmount: v.number(),
   },
@@ -31,23 +31,43 @@ export const purchaseContent = mutation({
         .filter((q) => q.eq(q.field("_id"), args.contentId))
         .first();
       contentAuthorId = content?.authorId;
+      
+      if (!content || !content.isGated) {
+        throw new Error("Content not found or not gated");
+      }
     } else if (args.contentType === 'reel') {
       content = await ctx.db
         .query("reels")
         .filter((q) => q.eq(q.field("_id"), args.contentId))
         .first();
       contentAuthorId = content?.authorId;
+      
+      if (!content || !content.isGated) {
+        throw new Error("Content not found or not gated");
+      }
+    } else if (args.contentType === 'course') {
+      content = await ctx.db
+        .query("courses")
+        .filter((q) => q.eq(q.field("_id"), args.contentId))
+        .first();
+      contentAuthorId = content?.authorId;
+      
+      if (!content || !content.isPublished) {
+        throw new Error("Course not found or not published");
+      }
     } else {
       throw new Error("Invalid content type");
     }
 
-    if (!content || !content.isGated) {
-      throw new Error("Content not found or not gated");
-    }
-
     // Verify payment amount matches content price
-    if (content.priceToken !== args.priceToken || content.priceAmount !== args.priceAmount) {
-      throw new Error("Payment amount mismatch");
+    if (args.contentType === 'course') {
+      if (content.priceCurrency !== args.priceToken || content.totalPrice !== args.priceAmount) {
+        throw new Error("Payment amount mismatch");
+      }
+    } else {
+      if (content.priceToken !== args.priceToken || content.priceAmount !== args.priceAmount) {
+        throw new Error("Payment amount mismatch");
+      }
     }
 
     if (!contentAuthorId) {
@@ -223,6 +243,93 @@ export const purchaseContent = mutation({
       }
     });
 
+    // Auto-enroll in course if purchasing a course
+    if (args.contentType === 'course') {
+      try {
+        // Check if already enrolled
+        const existingEnrollment = await ctx.db
+          .query("courseEnrollments")
+          .withIndex("by_user_course", (q) => 
+            q.eq("userId", userId).eq("courseId", args.contentId as Id<"courses">)
+          )
+          .first();
+
+        if (!existingEnrollment) {
+          await ctx.db.insert("courseEnrollments", {
+            userId,
+            courseId: args.contentId as Id<"courses">,
+            enrolledAt: Date.now(),
+            progress: 0,
+          });
+
+          // Notify course author about enrollment
+          await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {
+            type: 'COURSE_STARTED',
+            recipientUserId: contentAuthorId,
+            actorUserId: userId,
+            relatedContentType: 'course',
+            relatedContentId: args.contentId,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to auto-enroll in course:", error);
+        // Don't fail the payment, just log the error
+      }
+    }
+
+    // Auto-enroll in courses if purchasing individual content that's part of courses
+    if (args.contentType === 'article' || args.contentType === 'reel') {
+      try {
+        // Find courses containing this content
+        const courseContent = await ctx.db
+          .query("courseContent")
+          .withIndex("by_content", (q) => 
+            q.eq("contentType", args.contentType).eq("contentId", args.contentId as Id<"articles"> | Id<"reels">)
+          )
+          .collect();
+
+        for (const courseItem of courseContent) {
+          const course = await ctx.db.get(courseItem.courseId);
+          if (!course || !course.isPublished) continue;
+
+          // Check if already enrolled
+          const existingEnrollment = await ctx.db
+            .query("courseEnrollments")
+            .withIndex("by_user_course", (q) => 
+              q.eq("userId", userId).eq("courseId", courseItem.courseId)
+            )
+            .first();
+
+          if (!existingEnrollment) {
+            await ctx.db.insert("courseEnrollments", {
+              userId,
+              courseId: courseItem.courseId,
+              enrolledAt: Date.now(),
+              progress: 0,
+            });
+
+            // Notify course author about enrollment
+            await ctx.scheduler.runAfter(0, internal.notifications.createNotificationEvent, {
+              type: 'COURSE_STARTED',
+              recipientUserId: course.authorId,
+              actorUserId: userId,
+              relatedContentType: 'course',
+              relatedContentId: courseItem.courseId,
+            });
+          }
+
+          // Update course progress since user now has access to this content
+          await ctx.scheduler.runAfter(0, internal.courseProgress.updateCourseProgress, {
+            userId,
+            courseId: courseItem.courseId,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to auto-enroll in courses from individual content purchase:", error);
+        // Don't fail the payment, just log the error
+      }
+    }
+
     return {
       success: true,
       paymentId,
@@ -238,14 +345,13 @@ export const purchaseContent = mutation({
 export const hasAccess = query({
   args: {
     contentType: v.string(),
-    contentId: v.union(v.id("articles"), v.id("reels")),
+    contentId: v.union(v.id("articles"), v.id("reels"), v.id("courses")),
   },
   handler: async (ctx, args) => {
     try {
       const userId = await getAuthUserId(ctx);
       if (!userId) {
         return false;
-
       }
 
       // Check if user is the creator
@@ -258,13 +364,9 @@ export const hasAccess = query({
         if (!content) {
           return false;
         }
-        
-        if (content.authorId === userId) {
-          return true;
-        }
-        
-        // If content is not gated, everyone has access
-        if (!content.isGated) {
+
+        // Free content or user is the author
+        if (!content.isGated || content.authorId === userId) {
           return true;
         }
       } else if (args.contentType === 'reel') {
@@ -276,17 +378,42 @@ export const hasAccess = query({
         if (!content) {
           return false;
         }
+
+        // Free content or user is the author
+        if (!content.isGated || content.authorId === userId) {
+          return true;
+        }
+      } else if (args.contentType === 'course') {
+        const content = await ctx.db
+          .query("courses")
+          .filter((q) => q.eq(q.field("_id"), args.contentId))
+          .first();
         
+        if (!content) {
+          return false;
+        }
+
+        // User is the author
         if (content.authorId === userId) {
           return true;
         }
-        
-        // If content is not gated, everyone has access
-        if (!content.isGated) {
+
+        // Free course
+        if (content.totalPrice === 0) {
           return true;
         }
-      } else {
-        return false;
+
+        // Check if enrolled (for paid courses)
+        const enrollment = await ctx.db
+          .query("courseEnrollments")
+          .withIndex("by_user_course", (q) => 
+            q.eq("userId", userId).eq("courseId", args.contentId as Id<"courses">)
+          )
+          .first();
+
+        if (enrollment) {
+          return true;
+        }
       }
 
       // Check if user has purchased access

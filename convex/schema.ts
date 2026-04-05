@@ -126,6 +126,7 @@ export default defineSchema({
     status: v.string(), // DRAFT | PUBLISHED | ARCHIVED
     publishedAt: v.optional(v.number()),
     isSensitive: v.boolean(),
+    isPublic: v.optional(v.boolean()), // Optional for migration compatibility
     // Gating with custom token (sellerAddress temporarily optional for migration)
     isGated: v.boolean(),
     priceToken: v.optional(v.string()), // e.g., "USD"
@@ -134,7 +135,13 @@ export default defineSchema({
     views: v.number(),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
-  }).index("by_slug", ["slug"]).index("by_author", ["authorId"]).index("by_tag", ["tags"]).index("by_status", ["status"]).index("by_created", ["createdAt"]),
+  }).index("by_slug", ["slug"])
+    .index("by_author", ["authorId"])
+    .index("by_tag", ["tags"])
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"])
+    .index("by_public", ["isPublic"])
+    .index("by_public_status", ["isPublic", "status"]),
 
   // ✅ Reels table
   reels: defineTable({
@@ -145,6 +152,7 @@ export default defineSchema({
     caption: v.optional(v.string()),
     tags: v.array(v.string()),
     isSensitive: v.boolean(),
+    isPublic: v.optional(v.boolean()), // Optional for migration compatibility
     // Gating with custom token (sellerAddress temporarily optional for migration)
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
@@ -152,7 +160,9 @@ export default defineSchema({
     sellerAddress: v.optional(v.string()), // TEMPORARY: Remove after migration
     views: v.number(),
     createdAt: v.number()
-  }).index("by_author", ["authorId"]).index("by_created", ["createdAt"]),
+  }).index("by_author", ["authorId"])
+    .index("by_created", ["createdAt"])
+    .index("by_public", ["isPublic"]),
 
   // ✅ Comments table
   comments: defineTable({
@@ -217,8 +227,8 @@ export default defineSchema({
   // ✅ Payments audit trail (updated for internal transactions)
   payments: defineTable({
     payerId: v.id("users"),
-    contentType: v.string(), // 'article' | 'reel'
-    contentId: v.union(v.id("articles"), v.id("reels")),
+    contentType: v.string(), // 'article' | 'reel' | 'course'
+    contentId: v.union(v.id("articles"), v.id("reels"), v.id("courses")),
     token: v.string(),
     amount: v.number(),
     transactionId: v.string(), // Reference to internal transaction
@@ -580,5 +590,62 @@ export default defineSchema({
     autoAcceptFromFollowing: v.boolean(), // Auto-accept conversations from people you follow
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
+  }).index("by_user", ["userId"]),
+
+  // ✅ Courses table
+  courses: defineTable({
+    authorId: v.id("users"),
+    title: v.string(),
+    description: v.string(),
+    coverImage: v.optional(v.string()), // storage id
+    category: v.string(),
+    tags: v.array(v.string()),
+    totalPrice: v.number(), // Calculated from all content
+    priceCurrency: v.string(),
+    isPublished: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_author", ["authorId"])
+    .index("by_category", ["category"])
+    .index("by_published", ["isPublished"])
+    .index("by_created", ["createdAt"])
+    .index("by_tags", ["tags"]),
+
+  // ✅ Course content (links existing articles/reels to courses)
+  courseContent: defineTable({
+    courseId: v.id("courses"),
+    contentType: v.string(), // "article" | "reel"
+    contentId: v.union(v.id("articles"), v.id("reels")),
+    order: v.number(), // Position in course
+    isRequired: v.boolean(),
+    createdAt: v.number()
+  }).index("by_course", ["courseId"])
+    .index("by_content", ["contentType", "contentId"])
+    .index("by_course_order", ["courseId", "order"]),
+
+  // ✅ Course enrollments
+  courseEnrollments: defineTable({
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+    enrolledAt: v.number(),
+    completedAt: v.optional(v.number()),
+    progress: v.number(), // 0-100 percentage
+    lastAccessedAt: v.optional(v.number())
   }).index("by_user", ["userId"])
+    .index("by_course", ["courseId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_enrolled", ["enrolledAt"])
+    .index("by_completed", ["completedAt"]),
+
+  // ✅ Course progress tracking
+  courseProgress: defineTable({
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+    contentId: v.union(v.id("articles"), v.id("reels")),
+    completedAt: v.number(),
+    timeSpent: v.optional(v.number()) // in seconds
+  }).index("by_user_course", ["userId", "courseId"])
+    .index("by_user_content", ["userId", "contentId"])
+    .index("by_course", ["courseId"])
+    .index("by_completed", ["completedAt"])
 });

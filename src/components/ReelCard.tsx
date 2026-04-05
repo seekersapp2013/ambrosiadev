@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { GatedContentPaywall } from "./GatedContentPaywall";
+import { EnhancedPaywall } from "./EnhancedPaywall";
 import { ReelEngagement } from "./ReelEngagement";
 
 interface ReelCardProps {
@@ -37,7 +37,7 @@ export function ReelCard({ reel, isActive = false, onNavigate }: ReelCardProps) 
   const videoRef = useRef<HTMLVideoElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const hasAccess = useQuery(api.payments.hasAccess, {
+  const hasAccess = useQuery(api.courseProgress.hasContentAccess, {
     contentType: "reel",
     contentId: reel._id,
   });
@@ -201,20 +201,15 @@ export function ReelCard({ reel, isActive = false, onNavigate }: ReelCardProps) 
             {/* Gated Content Overlay */}
             {reel.isGated && !hasAccess && (
               <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">
-                <div className="bg-white rounded-lg max-w-sm mx-4">
-                  <GatedContentPaywall
-                    contentType="reel"
-                    contentId={reel._id}
-                    title={reel.caption || 'Premium Reel'}
-                    price={reel.priceAmount || 0}
-                    token={reel.priceToken || "USD"}
-                    sellerAddress={reel.sellerAddress}
-                    onUnlock={() => {
-                      // Content will automatically become accessible after payment
-                    }}
-                    onFundWallet={() => onNavigate?.('fund-wallet')}
-                  />
-                </div>
+                <EnhancedPaywall
+                  contentType="reel"
+                  contentId={reel._id}
+                  title={reel.caption || 'Premium Reel'}
+                  onUnlock={() => {
+                    // Content will automatically become accessible after payment
+                  }}
+                  onFundWallet={() => onNavigate?.('fund-wallet')}
+                />
               </div>
             )}
 

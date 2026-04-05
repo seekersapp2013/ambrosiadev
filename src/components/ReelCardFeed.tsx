@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { CourseIndicator } from "./CourseIndicator";
 
 interface ReelCardFeedProps {
   reel: {
@@ -30,7 +31,7 @@ interface ReelCardFeedProps {
 export function ReelCardFeed({ reel, onNavigate }: ReelCardFeedProps) {
   const [showSensitiveContent, setShowSensitiveContent] = useState(false);
 
-  const hasAccess = useQuery(api.payments.hasAccess, {
+  const hasAccess = useQuery(api.courseProgress.hasContentAccess, {
     contentType: "reel",
     contentId: reel._id,
   });
@@ -175,6 +176,13 @@ export function ReelCardFeed({ reel, onNavigate }: ReelCardFeedProps) {
 
         {/* Video Thumbnail */}
         <div className="relative mb-3">
+          {/* Course Indicator */}
+          <CourseIndicator 
+            contentType="reel"
+            contentId={reel._id}
+            onNavigate={onNavigate}
+          />
+          
           {reel.isSensitive && !showSensitiveContent ? (
             <div className="relative aspect-video">
               <div className="absolute inset-0 graphic-content-warning flex flex-col items-center justify-center text-white p-4 text-center z-10 rounded-lg">
@@ -254,7 +262,7 @@ export function ReelCardFeed({ reel, onNavigate }: ReelCardFeedProps) {
               </span>
             </div>
             <p className="text-xs text-gray-600 mt-1">
-              Unlock this reel to watch the full video
+              Unlock this reel to watch the full video • May be part of a course
             </p>
           </div>
         )}

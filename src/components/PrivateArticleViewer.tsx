@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { ArticleEngagement } from "./ArticleEngagement";
-import { GatedContentPaywall } from "./GatedContentPaywall";
+import { EnhancedPaywall } from "./EnhancedPaywall";
 import { useEffect } from "react";
 
 interface PrivateArticleViewerProps {
@@ -17,7 +17,7 @@ export function PrivateArticleViewer({ articleId, onBack, onNavigate }: PrivateA
     const createOrGetConversation = useMutation(api.chats.createOrGetConversation);
 
     // Check if user has access to gated content
-    const hasAccess = useQuery(api.payments.hasAccess, {
+    const hasAccess = useQuery(api.courseProgress.hasContentAccess, {
         contentType: "article",
         contentId: articleId,
     });
@@ -101,18 +101,17 @@ export function PrivateArticleViewer({ articleId, onBack, onNavigate }: PrivateA
                     <h1 className="text-lg font-semibold">Premium Content</h1>
                     <div></div>
                 </div>
-                <GatedContentPaywall
-                    contentType="article"
-                    contentId={article._id}
-                    title={article.title}
-                    price={article.priceAmount || 0}
-                    token={article.priceToken || "USD"}
-                    sellerAddress={article.sellerAddress}
-                    onUnlock={() => {
-                        // Content will automatically become accessible after payment
-                    }}
-                    onFundWallet={() => onNavigate?.('fund-wallet')}
-                />
+                <div className="flex items-center justify-center min-h-[60vh]">
+                    <EnhancedPaywall
+                        contentType="article"
+                        contentId={article._id}
+                        title={article.title}
+                        onUnlock={() => {
+                            // Content will automatically become accessible after payment
+                        }}
+                        onFundWallet={() => onNavigate?.('fund-wallet')}
+                    />
+                </div>
             </div>
         );
     }

@@ -13,6 +13,7 @@ export const createArticle = mutation({
     coverImage: v.optional(v.string()),
     tags: v.array(v.string()),
     isSensitive: v.boolean(),
+    isPublic: v.boolean(), // New field for content visibility
     isGated: v.boolean(),
     priceToken: v.optional(v.string()),
     priceAmount: v.optional(v.number()),
@@ -67,6 +68,7 @@ export const createArticle = mutation({
       status: "PUBLISHED",
       publishedAt: Date.now(),
       isSensitive: args.isSensitive,
+      isPublic: args.isPublic, // Add the new field
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
@@ -227,7 +229,7 @@ export const getArticleBySlug = query({
   },
 });
 
-// List articles for feed
+// List articles for feed (only public articles)
 export const listFeed = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
@@ -236,6 +238,10 @@ export const listFeed = query({
     const articles = await ctx.db
       .query("articles")
       .withIndex("by_status", (q) => q.eq("status", "PUBLISHED"))
+      .filter((q) => q.or(
+        q.eq(q.field("isPublic"), true),
+        q.eq(q.field("isPublic"), undefined)
+      ))
       .order("desc")
       .take(limit);
 
@@ -438,4 +444,44 @@ export const deleteArticle = mutation({
       deletedPayments: payments.length
     };
   }
+});
+
+// List articles created by current user
+export const listMyArticles = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const limit = args.limit || 20;
+
+    const articles = await ctx.db
+      .query("articles")
+      .withIndex("by_author", (q) => q.eq("authorId", userId))
+      .order("desc")
+      .take(limit);
+
+    // Get author info for each article
+    const articlesWithAuthors = await Promise.all(
+      articles.map(async (article) => {
+        const author = await ctx.db.get(article.authorId);
+        const profile = await ctx.db
+          .query("profiles")
+          .filter((q) => q.eq(q.field("userId"), article.authorId))
+          .first();
+
+        return {
+          ...article,
+          author: {
+            id: author?._id,
+            name: author?.name || profile?.name,
+            username: profile?.username,
+            avatar: profile?.avatar,
+          },
+        };
+      })
+    );
+
+    return articlesWithAuthors;
+  },
 });

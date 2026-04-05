@@ -19,15 +19,26 @@ interface ReelEngagementProps {
   onNavigate?: (screen: string, data?: any) => void;
   disabled?: boolean;
   hasAccess?: boolean;
+  courseContext?: {
+    courseId: Id<"courses">;
+    showProgressTracking?: boolean;
+  };
 }
 
-export function ReelEngagement({ reel, onNavigate, disabled = false, hasAccess }: ReelEngagementProps) {
+export function ReelEngagement({ 
+  reel, 
+  onNavigate, 
+  disabled = false, 
+  hasAccess,
+  courseContext 
+}: ReelEngagementProps) {
   const { isAuthenticated } = useConvexAuth();
   const [showShare, setShowShare] = useState(false);
   
   const likeReel = useMutation(api.engagement.likeReel);
   const bookmarkReel = useMutation(api.engagement.bookmarkReel);
   const startChat = useMutation(api.chat.startChatWithAuthor);
+  const markContentCompleted = useMutation(api.courseProgress.markContentCompleted);
   
   // Get like and bookmark status from database
   const isLiked = useQuery(api.engagement.isLiked, { 
@@ -39,6 +50,16 @@ export function ReelEngagement({ reel, onNavigate, disabled = false, hasAccess }
     contentId: reel._id 
   });
   const likeCount = useQuery(api.engagement.getReelLikeCount, { reelId: reel._id });
+
+  // Course progress tracking
+  const courseProgress = useQuery(
+    api.courseProgress.getCourseProgress,
+    courseContext ? { courseId: courseContext.courseId } : "skip"
+  );
+
+  const isContentCompleted = courseProgress?.completedContent.some(
+    completed => completed.contentId === reel._id
+  ) || false;
 
   // Get author avatar URL
   const authorAvatarUrl = useQuery(
@@ -112,6 +133,21 @@ export function ReelEngagement({ reel, onNavigate, disabled = false, hasAccess }
       }
     } catch (error: any) {
       alert(error.message || 'Failed to start chat with author');
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    if (!courseContext || !isAuthenticated) return;
+    
+    try {
+      await markContentCompleted({
+        courseId: courseContext.courseId,
+        contentId: reel._id,
+        timeSpent: 180, // 3 minutes default for reels
+      });
+    } catch (error) {
+      console.error("Failed to mark reel as completed:", error);
+      alert("Failed to mark as completed. Please try again.");
     }
   };
 
@@ -219,6 +255,25 @@ export function ReelEngagement({ reel, onNavigate, disabled = false, hasAccess }
           </div>
         )}
       </div>
+
+      {/* Course Progress Button */}
+      {courseContext?.showProgressTracking && courseProgress?.enrollment && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          {isContentCompleted ? (
+            <div className="flex items-center space-x-2 text-green-600">
+              <i className="fas fa-check-circle"></i>
+              <span className="text-sm font-medium">Completed</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleMarkComplete}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            >
+              Mark as Complete
+            </button>
+          )}
+        </div>
+      )}
 
     </div>
   );

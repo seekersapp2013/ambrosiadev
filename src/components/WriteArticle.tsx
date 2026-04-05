@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Editor } from '@tinymce/tinymce-react';
 import { PaymentConfig } from './UnifiedPayment';
+import { Id } from "../../convex/_generated/dataModel";
 
 interface WriteArticleProps {
   onBack?: () => void;
@@ -18,14 +19,22 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
   const [priceAmount, setPriceAmount] = useState(1);
   const [priceCurrency, setPriceCurrency] = useState("USD");
   const [isSensitive, setIsSensitive] = useState(false);
+  const [isPublic, setIsPublic] = useState(true); // New field for content visibility
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<Id<"courses"> | "">("");
+  const [addToCourse, setAddToCourse] = useState(false);
 
   const createArticle = useMutation(api.articles.createArticle);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const addContentToCourse = useMutation(api.courses.addContentToCourse);
   const myProfile = useQuery(api.profiles.getMyProfile);
   const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const myCourses = useQuery(api.courses.listCourses, { 
+    authorId: myProfile?.userId,
+    limit: 50 
+  });
 
   // Set default currency to user's primary currency
   useState(() => {
@@ -82,7 +91,7 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
         hasValidHTML: contentHtml.includes('<p>')
       });
 
-      await createArticle({
+      const articleId = await createArticle({
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
         contentHtml: contentHtml,
@@ -92,7 +101,29 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
         priceToken: isGated ? priceCurrency : undefined,
         priceAmount: isGated ? priceAmount : undefined,
         isSensitive,
+        isPublic, // Add the new field
       });
+
+      // Add to course if selected
+      if (addToCourse && selectedCourseId) {
+        try {
+          // Get course to determine next order
+          const course = await fetch(`/api/courses/${selectedCourseId}`).catch(() => null);
+          const nextOrder = course ? (course as any).content?.length + 1 : 1;
+          
+          await addContentToCourse({
+            courseId: selectedCourseId as Id<"courses">,
+            contentType: "article",
+            contentId: articleId,
+            order: nextOrder,
+            isRequired: true,
+          });
+        } catch (error) {
+          console.error("Failed to add article to course:", error);
+          // Don't fail the whole operation, just show a warning
+          alert("Article created successfully, but failed to add to course. You can add it manually later.");
+        }
+      }
 
       // Navigate back to stream
       onNavigate?.('stream-screen');
@@ -223,6 +254,41 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
 
         {/* Options */}
         <div className="space-y-3 pt-4 border-t border-gray-200">
+          {/* Content Visibility */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Content Visibility
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center space-x-3">
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={isPublic}
+                  onChange={() => setIsPublic(true)}
+                  className="w-4 h-4 text-accent border-gray-300 focus:ring-accent"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Public</span>
+                  <p className="text-xs text-gray-500">Shows in stream and available for courses</p>
+                </div>
+              </label>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={!isPublic}
+                  onChange={() => setIsPublic(false)}
+                  className="w-4 h-4 text-accent border-gray-300 focus:ring-accent"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Course-only</span>
+                  <p className="text-xs text-gray-500">Only available for courses, never shows in stream</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           {/* Sensitive Content */}
           <label className="flex items-center space-x-3">
             <input
@@ -246,6 +312,43 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
             setPriceCurrency={setPriceCurrency}
             contentType="article"
           />
+
+          {/* Course Integration */}
+          {myCourses && myCourses.length > 0 && (
+            <div className="pt-4 border-t border-gray-200">
+              <label className="flex items-center space-x-3 mb-3">
+                <input
+                  type="checkbox"
+                  checked={addToCourse}
+                  onChange={(e) => setAddToCourse(e.target.checked)}
+                  className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent"
+                />
+                <span className="text-sm text-gray-700">
+                  Add to course
+                </span>
+              </label>
+
+              {addToCourse && (
+                <div className="ml-7">
+                  <select
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value as Id<"courses"> | "")}
+                    className="w-full text-sm border border-gray-300 rounded px-3 py-2 bg-white"
+                  >
+                    <option value="">Select a course</option>
+                    {myCourses.filter(course => !course.isPublished).map((course) => (
+                      <option key={course._id} value={course._id}>
+                        {course.title}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Only unpublished courses are shown
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Submit Button */}

@@ -23,6 +23,10 @@ import { WriteArticle } from "./components/WriteArticle";
 import { WriteReel } from "./components/WriteReel";
 import { Paywall } from "./components/Paywall";
 import { CommentSection } from "./components/CommentSection";
+import { CreateCourse } from "./components/CreateCourse";
+import { EditCourse } from "./components/EditCourse";
+import { CourseContentManager } from "./components/CourseContentManager";
+import { CourseViewer } from "./components/CourseViewer";
 
 import { PrivateArticleViewer } from "./components/PrivateArticleViewer";
 import { PrivateReelViewer } from "./components/PrivateReelViewer";
@@ -97,6 +101,26 @@ function MainApp() {
         return <WriteArticle onBack={() => showScreen('ArticleScreen')} onNavigate={showScreen} />;
       case 'write-reel':
         return <WriteReel onBack={() => showScreen('ArticleScreen')} onNavigate={showScreen} />;
+      case 'create-course':
+        return <CreateCourse onBack={() => showScreen('ArticleScreen')} onNavigate={showScreen} />;
+      case 'edit-course':
+        return <EditCourse 
+          courseId={currentScreenData?.courseId} 
+          onBack={() => showScreen('ArticleScreen')} 
+          onNavigate={showScreen} 
+        />;
+      case 'course-content-manager':
+        return <CourseContentManager 
+          courseId={currentScreenData?.courseId} 
+          onBack={() => showScreen('ArticleScreen')} 
+          onNavigate={showScreen} 
+        />;
+      case 'course-viewer':
+        return <CourseViewer 
+          courseId={currentScreenData?.courseId} 
+          onBack={() => showScreen('ArticleScreen')} 
+          onNavigate={showScreen} 
+        />;
       case 'paywall':
         return <Paywall
           contentType={currentScreenData?.contentType || 'article'}

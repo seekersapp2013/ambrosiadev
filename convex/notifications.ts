@@ -122,6 +122,42 @@ export const NOTIFICATION_TYPES: Record<string, NotificationType> = {
     priority: 'high',
     batchable: false,
     defaultChannels: ['in_app', 'email']
+  },
+  NEW_COURSE: {
+    id: 'NEW_COURSE',
+    name: 'New Course',
+    description: 'Someone you follow published a new course',
+    category: 'content',
+    priority: 'medium',
+    batchable: true,
+    defaultChannels: ['in_app', 'email']
+  },
+  COURSE_STARTED: {
+    id: 'COURSE_STARTED',
+    name: 'Course Started',
+    description: 'Someone enrolled in your course',
+    category: 'engagement',
+    priority: 'medium',
+    batchable: true,
+    defaultChannels: ['in_app', 'email']
+  },
+  COURSE_COMPLETED: {
+    id: 'COURSE_COMPLETED',
+    name: 'Course Completed',
+    description: 'Someone completed your course',
+    category: 'engagement',
+    priority: 'high',
+    batchable: false,
+    defaultChannels: ['in_app', 'email']
+  },
+  COURSE_PROGRESS: {
+    id: 'COURSE_PROGRESS',
+    name: 'Course Progress',
+    description: 'You reached a milestone in a course',
+    category: 'content',
+    priority: 'low',
+    batchable: true,
+    defaultChannels: ['in_app']
   }
 };
 

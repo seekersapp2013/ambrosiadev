@@ -24,6 +24,7 @@ export const createTestArticle = mutation({
       status: "PUBLISHED",
       publishedAt: Date.now(),
       isSensitive: false,
+      isPublic: true, // Add the missing field
       isGated: false,
       views: 0,
       createdAt: Date.now(),
