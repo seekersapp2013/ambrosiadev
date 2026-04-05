@@ -57,6 +57,14 @@ export const createBooking = mutation({
     // Calculate total amount for 1-on-1 session
     const totalAmount = (duration / 60) * (provider.oneOnOnePrice || provider.sessionPrice);
 
+    // Get user's wallet to determine currency
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("userId", (q) => q.eq("userId", userId))
+      .first();
+    
+    const currency = wallet?.primaryCurrency || "USD";
+
     const now = Date.now();
 
     // Generate unique room name for live streaming
@@ -70,6 +78,7 @@ export const createBooking = mutation({
       sessionTime: args.sessionTime,
       duration,
       totalAmount,
+      currency,
       status: confirmationType === "AUTOMATIC" ? "CONFIRMED" : "PENDING",
       paymentTxHash: args.paymentTxHash,
       confirmationType,
@@ -161,6 +170,14 @@ export const createEventBooking = mutation({
     // Use event's room name if it exists, otherwise create one
     const roomName = event.liveStreamRoomName || `event-${args.eventId}-${Date.now()}`;
 
+    // Get user's wallet to determine currency
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("userId", (q) => q.eq("userId", userId))
+      .first();
+    
+    const currency = event.priceCurrency || wallet?.primaryCurrency || "USD";
+
     // Create booking
     const bookingId = await ctx.db.insert("bookings", {
       providerId: event.providerId,
@@ -169,6 +186,7 @@ export const createEventBooking = mutation({
       sessionTime: event.sessionTime,
       duration: event.duration,
       totalAmount: event.pricePerPerson,
+      currency,
       status: confirmationType === "AUTOMATIC" ? "CONFIRMED" : "PENDING",
       paymentTxHash: args.paymentTxHash,
       confirmationType,

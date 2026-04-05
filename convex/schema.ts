@@ -482,6 +482,7 @@ export default defineSchema({
     sessionTime: v.string(), // HH:MM format
     duration: v.number(), // Duration in minutes (default 60)
     totalAmount: v.number(), // Total price paid
+    currency: v.string(), // Currency code (USD, NGN, GBP, etc.)
     status: v.string(), // PENDING | CONFIRMED | CANCELLED | COMPLETED
     paymentTxHash: v.optional(v.string()),
     sessionDetails: v.optional(v.string()), // Meeting link or instructions
@@ -507,7 +508,8 @@ export default defineSchema({
     .index("by_event", ["eventId"])
     .index("by_session_type", ["sessionType"])
     .index("by_stream_status", ["liveStreamStatus"])
-    .index("by_room_name", ["liveStreamRoomName"]),
+    .index("by_room_name", ["liveStreamRoomName"])
+    .index("by_currency", ["currency"]),
 
   // ✅ Events table for 1-to-many bookings
   events: defineTable({
@@ -520,10 +522,14 @@ export default defineSchema({
     maxParticipants: v.number(), // Maximum number of participants
     currentParticipants: v.number(), // Current number of bookings
     pricePerPerson: v.number(), // Price per participant
+    priceCurrency: v.string(), // Currency code (USD, NGN, GBP, etc.)
     status: v.string(), // "ACTIVE" | "CANCELLED" | "COMPLETED" | "FULL"
     sessionDetails: v.optional(v.string()), // Meeting link or instructions
     tags: v.optional(v.array(v.string())), // Event tags/categories
     isPublic: v.boolean(), // Whether event is publicly visible
+    // Circle integration fields
+    circleId: v.optional(v.id("circles")), // Link event to a circle
+    isCircleExclusive: v.optional(v.boolean()), // Only circle members can join
     // LiveKit streaming fields
     liveStreamRoomName: v.optional(v.string()), // LiveKit room name
     liveStreamStatus: v.optional(v.string()), // "NOT_STARTED" | "LIVE" | "ENDED"
@@ -541,7 +547,9 @@ export default defineSchema({
     .index("by_public", ["isPublic"])
     .index("by_tags", ["tags"])
     .index("by_stream_status", ["liveStreamStatus"])
-    .index("by_room_name", ["liveStreamRoomName"]),
+    .index("by_room_name", ["liveStreamRoomName"])
+    .index("by_circle", ["circleId"])
+    .index("by_currency", ["priceCurrency"]),
 
   // ✅ Booking Settings table
   bookingSettings: defineTable({
@@ -647,5 +655,165 @@ export default defineSchema({
   }).index("by_user_course", ["userId", "courseId"])
     .index("by_user_content", ["userId", "contentId"])
     .index("by_course", ["courseId"])
-    .index("by_completed", ["completedAt"])
+    .index("by_completed", ["completedAt"]),
+
+  // ✅ Circles table (Slack-like community channels)
+  circles: defineTable({
+    name: v.string(),
+    description: v.string(),
+    creatorId: v.id("users"),
+    communityId: v.optional(v.id("communities")), // For future multi-community support
+    type: v.string(), // "PUBLIC" | "PRIVATE"
+    accessType: v.string(), // "FREE" | "PAID"
+    price: v.optional(v.number()),
+    priceCurrency: v.optional(v.string()),
+    coverImage: v.optional(v.string()), // storage id
+    inviteCode: v.optional(v.string()), // Unique code for private circles
+    maxMembers: v.optional(v.number()),
+    currentMembers: v.number(),
+    tags: v.array(v.string()),
+    isActive: v.boolean(),
+    // Admin-only posting feature (like WhatsApp admin-only groups)
+    postingPermission: v.string(), // "EVERYONE" | "ADMINS_ONLY"
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_creator", ["creatorId"])
+    .index("by_type", ["type"])
+    .index("by_access", ["accessType"])
+    .index("by_active", ["isActive"])
+    .index("by_invite_code", ["inviteCode"])
+    .index("by_posting_permission", ["postingPermission"])
+    .index("by_created", ["createdAt"]),
+
+  // ✅ Circle Members table
+  circleMembers: defineTable({
+    circleId: v.id("circles"),
+    userId: v.id("users"),
+    role: v.string(), // "CREATOR" | "ADMIN" | "MODERATOR" | "MEMBER"
+    joinedAt: v.number(),
+    lastActiveAt: v.optional(v.number()),
+    paymentTxId: v.optional(v.string()), // For paid circles
+    isActive: v.boolean(),
+    isMuted: v.optional(v.boolean()), // User muted the circle
+    isBanned: v.optional(v.boolean()) // User banned from circle
+  }).index("by_circle", ["circleId"])
+    .index("by_user", ["userId"])
+    .index("by_circle_user", ["circleId", "userId"])
+    .index("by_role", ["role"])
+    .index("by_circle_active", ["circleId", "isActive"]),
+
+  // ✅ Circle Messages table
+  circleMessages: defineTable({
+    circleId: v.id("circles"),
+    senderId: v.id("users"),
+    messageType: v.string(), // "text" | "image" | "video" | "audio" | "emoji" | "file"
+    content: v.string(), // Text content or storage ID for media
+    replyToId: v.optional(v.id("circleMessages")), // For threading
+    isEdited: v.boolean(),
+    isPinned: v.boolean(),
+    isDeleted: v.optional(v.boolean()), // Soft delete
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    editedAt: v.optional(v.number())
+  }).index("by_circle", ["circleId"])
+    .index("by_sender", ["senderId"])
+    .index("by_circle_created", ["circleId", "createdAt"])
+    .index("by_reply", ["replyToId"])
+    .index("by_pinned", ["isPinned"]),
+
+  // ✅ Circle Message Reactions table (emoji reactions)
+  circleMessageReactions: defineTable({
+    messageId: v.id("circleMessages"),
+    userId: v.id("users"),
+    emoji: v.string(),
+    createdAt: v.number()
+  }).index("by_message", ["messageId"])
+    .index("by_user", ["userId"])
+    .index("by_message_user", ["messageId", "userId"])
+    .index("by_message_emoji", ["messageId", "emoji"]),
+
+  // ✅ Circle Invites table
+  circleInvites: defineTable({
+    circleId: v.id("circles"),
+    inviterId: v.id("users"),
+    inviteeId: v.optional(v.id("users")), // null for invite links
+    inviteCode: v.string(),
+    status: v.string(), // "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED"
+    expiresAt: v.optional(v.number()),
+    maxUses: v.optional(v.number()), // For invite links
+    currentUses: v.optional(v.number()),
+    createdAt: v.number()
+  }).index("by_circle", ["circleId"])
+    .index("by_invitee", ["inviteeId"])
+    .index("by_code", ["inviteCode"])
+    .index("by_status", ["status"])
+    .index("by_inviter", ["inviterId"]),
+
+  // ✅ Circle Audio/Video Rooms table
+  circleRooms: defineTable({
+    circleId: v.id("circles"),
+    roomName: v.string(), // LiveKit room name
+    roomType: v.string(), // "AUDIO" | "VIDEO"
+    creatorId: v.id("users"),
+    status: v.string(), // "ACTIVE" | "ENDED"
+    maxParticipants: v.optional(v.number()),
+    currentParticipants: v.number(),
+    isRecording: v.boolean(),
+    recordingId: v.optional(v.string()),
+    recordingStorageId: v.optional(v.string()),
+    createdAt: v.number(),
+    endedAt: v.optional(v.number())
+  }).index("by_circle", ["circleId"])
+    .index("by_status", ["status"])
+    .index("by_room_name", ["roomName"])
+    .index("by_creator", ["creatorId"]),
+
+  // ✅ Expert Requests table (for hiring experts into circles)
+  expertRequests: defineTable({
+    circleId: v.id("circles"),
+    requesterId: v.id("users"), // Circle creator
+    title: v.string(),
+    description: v.string(),
+    agreedAmount: v.number(),
+    agreedCurrency: v.string(),
+    duration: v.optional(v.number()), // Expected duration in hours
+    status: v.string(), // "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "DISPUTED"
+    selectedExpertId: v.optional(v.id("users")),
+    escrowTxId: v.optional(v.string()), // Transaction ID for escrowed funds
+    completedAt: v.optional(v.number()),
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_circle", ["circleId"])
+    .index("by_requester", ["requesterId"])
+    .index("by_status", ["status"])
+    .index("by_expert", ["selectedExpertId"])
+    .index("by_created", ["createdAt"]),
+
+  // ✅ Expert Applications table
+  expertApplications: defineTable({
+    requestId: v.id("expertRequests"),
+    expertId: v.id("users"),
+    coverLetter: v.string(),
+    proposedAmount: v.optional(v.number()), // If expert wants to negotiate
+    status: v.string(), // "PENDING" | "ACCEPTED" | "REJECTED"
+    createdAt: v.number()
+  }).index("by_request", ["requestId"])
+    .index("by_expert", ["expertId"])
+    .index("by_status", ["status"])
+    .index("by_request_expert", ["requestId", "expertId"]),
+
+  // ✅ Communities table (for future multi-community support)
+  communities: defineTable({
+    name: v.string(),
+    description: v.string(),
+    creatorId: v.id("users"),
+    coverImage: v.optional(v.string()),
+    isPublic: v.boolean(),
+    memberCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_creator", ["creatorId"])
+    .index("by_public", ["isPublic"])
+    .index("by_created", ["createdAt"])
 });

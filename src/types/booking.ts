@@ -180,6 +180,7 @@ export interface EventFormData {
   duration: number;
   maxParticipants: number;
   pricePerPerson: number;
+  priceCurrency?: string;
   sessionDetails?: string;
   tags?: string[];
   isPublic: boolean;

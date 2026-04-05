@@ -15,6 +15,7 @@ import { EventList } from './EventList';
 import { EventJoinFlow } from './EventJoinFlow';
 import { LiveStreamJoin } from './LiveStreamJoin';
 import { RecordingManagement } from './RecordingManagement';
+import { ExpertRequestsList } from './ExpertRequestsList';
 
 interface BookingScreenProps {
   onBack: () => void;
@@ -301,9 +302,20 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
             </div>
 
             {/* Available Events */}
-            <div>
+            <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Available Events</h2>
               <EventList onEventSelect={handleEventSelect} />
+            </div>
+
+            {/* Expert Requests */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800">Expert Requests</h2>
+                  <p className="text-sm text-gray-600">Apply to expert opportunities from circles</p>
+                </div>
+              </div>
+              <ExpertRequestsList />
             </div>
           </div>
         );

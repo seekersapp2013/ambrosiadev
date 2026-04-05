@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { EventFormData } from '../types/booking';
+import { Id } from '../../convex/_generated/dataModel';
+import { getSupportedCurrencies } from '../utils/currencyConfig';
 
 interface EventCreationProps {
   onBack: () => void;
   onSuccess: () => void;
+  circleId?: Id<'circles'>; // Optional circle context
+  isCircleExclusive?: boolean; // Whether event is circle-exclusive
 }
 
-export function EventCreation({ onBack, onSuccess }: EventCreationProps) {
+export function EventCreation({ onBack, onSuccess, circleId, isCircleExclusive = false }: EventCreationProps) {
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
@@ -17,6 +21,7 @@ export function EventCreation({ onBack, onSuccess }: EventCreationProps) {
     duration: 60,
     maxParticipants: 5,
     pricePerPerson: 25,
+    priceCurrency: 'USD',
     sessionDetails: '',
     tags: [],
     isPublic: true
@@ -25,11 +30,26 @@ export function EventCreation({ onBack, onSuccess }: EventCreationProps) {
   // Get provider's subscription to use default group session price
   const mySubscription = useQuery(api.bookingSubscribers.getMySubscription);
   
+  // Get user's wallet for default currency
+  const myWallet = useQuery(api.wallets.getWalletBalance.getMyWallet);
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
   const createEvent = useMutation(api.events.createEvent);
+  
+  const supportedCurrencies = getSupportedCurrencies();
+
+  // Set default currency from wallet
+  useEffect(() => {
+    if (myWallet && formData.priceCurrency === 'USD') {
+      setFormData(prev => ({
+        ...prev,
+        priceCurrency: myWallet.primaryCurrency || 'USD'
+      }));
+    }
+  }, [myWallet, formData.priceCurrency]);
 
   // Set default price when subscription loads
   useEffect(() => {
@@ -102,9 +122,12 @@ export function EventCreation({ onBack, onSuccess }: EventCreationProps) {
         duration: formData.duration,
         maxParticipants: formData.maxParticipants,
         pricePerPerson: formData.pricePerPerson,
+        priceCurrency: formData.priceCurrency || 'USD',
         sessionDetails: formData.sessionDetails || undefined,
         tags: formData.tags,
-        isPublic: formData.isPublic
+        isPublic: formData.isPublic,
+        circleId: circleId, // Pass circle context
+        isCircleExclusive: circleId ? isCircleExclusive : undefined // Only set if in circle context
       });
       onSuccess();
     } catch (error) {
@@ -276,23 +299,40 @@ export function EventCreation({ onBack, onSuccess }: EventCreationProps) {
           </div>
         </div>
 
-        {/* Price Per Person */}
+        {/* Price Per Person with Currency */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Price Per Person (USD) *
+            Price Per Person *
           </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.pricePerPerson}
-            onChange={(e) => setFormData(prev => ({ ...prev, pricePerPerson: parseFloat(e.target.value) || 0 }))}
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent ${
-              errors.pricePerPerson ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="25.00"
-          />
-          {errors.pricePerPerson && <p className="text-red-500 text-sm mt-1">{errors.pricePerPerson}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.pricePerPerson}
+                onChange={(e) => setFormData(prev => ({ ...prev, pricePerPerson: parseFloat(e.target.value) || 0 }))}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent ${
+                  errors.pricePerPerson ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="25.00"
+              />
+              {errors.pricePerPerson && <p className="text-red-500 text-sm mt-1">{errors.pricePerPerson}</p>}
+            </div>
+            <div>
+              <select
+                value={formData.priceCurrency || 'USD'}
+                onChange={(e) => setFormData(prev => ({ ...prev, priceCurrency: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {supportedCurrencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.flag} {currency.code} - {currency.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Session Details */}

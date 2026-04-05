@@ -13,9 +13,12 @@ export const createEvent = mutation({
     duration: v.number(), // Duration in minutes
     maxParticipants: v.number(),
     pricePerPerson: v.number(),
+    priceCurrency: v.string(), // Currency code
     sessionDetails: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
-    isPublic: v.optional(v.boolean())
+    isPublic: v.optional(v.boolean()),
+    circleId: v.optional(v.id("circles")), // Link to circle
+    isCircleExclusive: v.optional(v.boolean()) // Only circle members can join
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -23,14 +26,48 @@ export const createEvent = mutation({
       throw new Error("Not authenticated");
     }
 
-    // Check if user is a provider
-    const provider = await ctx.db
-      .query("bookingSubscribers")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
+    // If creating a circle event, verify user is a member with appropriate permissions
+    if (args.circleId) {
+      const circle = await ctx.db.get(args.circleId);
+      if (!circle) {
+        throw new Error("Circle not found");
+      }
 
-    if (!provider || !provider.isActive) {
-      throw new Error("Only active providers can create events");
+      const membership = await ctx.db
+        .query("circleMembers")
+        .withIndex("by_circle_user", (q) => 
+          q.eq("circleId", args.circleId!).eq("userId", userId)
+        )
+        .first();
+
+      if (!membership || !membership.isActive) {
+        throw new Error("You must be a circle member to create events");
+      }
+
+      // Only creator, admin, or moderator can create events
+      if (!["CREATOR", "ADMIN", "MODERATOR"].includes(membership.role)) {
+        throw new Error("Only circle admins can create events");
+      }
+
+      // For circle events, check if user is a provider (but allow creation if they're an admin)
+      const provider = await ctx.db
+        .query("bookingSubscribers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+
+      if (!provider || !provider.isActive) {
+        throw new Error("You must be a booking provider to create events. Please set up your provider profile first.");
+      }
+    } else {
+      // For non-circle events, strict provider check
+      const provider = await ctx.db
+        .query("bookingSubscribers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+
+      if (!provider || !provider.isActive) {
+        throw new Error("Only active providers can create events");
+      }
     }
 
     // Validate event data
@@ -95,10 +132,13 @@ export const createEvent = mutation({
       maxParticipants: args.maxParticipants,
       currentParticipants: 0,
       pricePerPerson: args.pricePerPerson,
+      priceCurrency: args.priceCurrency,
       status: "ACTIVE",
       sessionDetails: args.sessionDetails,
       tags: args.tags || [],
       isPublic: args.isPublic ?? true,
+      circleId: args.circleId,
+      isCircleExclusive: args.isCircleExclusive ?? false,
       createdAt: now
     });
 
@@ -584,6 +624,98 @@ export const getProviderSchedule = query({
         status: e.status,
         type: 'event'
       }))
+    };
+  }
+});
+
+// Get events for a specific circle
+export const getCircleEvents = query({
+  args: {
+    circleId: v.id("circles"),
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number())
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    
+    // Check if user is a member of the circle
+    if (userId) {
+      const membership = await ctx.db
+        .query("circleMembers")
+        .withIndex("by_circle_user", (q) => 
+          q.eq("circleId", args.circleId).eq("userId", userId)
+        )
+        .first();
+
+      if (!membership || !membership.isActive) {
+        throw new Error("You must be a circle member to view circle events");
+      }
+    } else {
+      throw new Error("Not authenticated");
+    }
+
+    const limit = args.limit || 20;
+    const offset = args.offset || 0;
+
+    // Get events for this circle
+    let query = ctx.db
+      .query("events")
+      .withIndex("by_circle", (q) => q.eq("circleId", args.circleId));
+
+    if (args.status) {
+      query = query.filter((q) => q.eq(q.field("status"), args.status));
+    }
+
+    const allEvents = await query.order("asc").collect();
+    const events = allEvents.slice(offset, offset + limit);
+
+    // Get provider information for each event
+    const eventsWithProviders = await Promise.all(
+      events.map(async (event) => {
+        const provider = await ctx.db
+          .query("bookingSubscribers")
+          .withIndex("by_user", (q) => q.eq("userId", event.providerId))
+          .first();
+
+        const providerProfile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", event.providerId))
+          .first();
+
+        // Check if current user has already booked this event
+        let userBooking = null;
+        if (userId) {
+          userBooking = await ctx.db
+            .query("bookings")
+            .withIndex("by_event", (q) => q.eq("eventId", event._id))
+            .filter((q) => q.and(
+              q.eq(q.field("clientId"), userId),
+              q.or(
+                q.eq(q.field("status"), "CONFIRMED"),
+                q.eq(q.field("status"), "PENDING")
+              )
+            ))
+            .first();
+        }
+
+        return {
+          ...event,
+          provider: {
+            subscription: provider,
+            profile: providerProfile
+          },
+          availableSpots: event.maxParticipants - event.currentParticipants,
+          userHasBooked: !!userBooking,
+          userBookingId: userBooking?._id
+        };
+      })
+    );
+
+    return {
+      events: eventsWithProviders,
+      hasMore: offset + limit < allEvents.length,
+      total: allEvents.length
     };
   }
 });
