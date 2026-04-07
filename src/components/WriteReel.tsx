@@ -28,7 +28,7 @@ export function WriteReel({ onBack, onNavigate }: WriteReelProps) {
   const createReel = useMutation(api.reels.createReel);
   const addContentToCourse = useMutation(api.courses.addContentToCourse);
   const myProfile = useQuery(api.profiles.getMyProfile);
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
   const myCourses = useQuery(api.courses.listCourses, { 
     authorId: myProfile?.userId,
     limit: 50 

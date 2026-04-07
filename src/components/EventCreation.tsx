@@ -13,6 +13,15 @@ interface EventCreationProps {
 }
 
 export function EventCreation({ onBack, onSuccess, circleId, isCircleExclusive = false }: EventCreationProps) {
+  // PHASE 2: Event type state
+  const [eventType, setEventType] = useState<'LIVE_STREAM' | 'AUDIO_ONLY'>('LIVE_STREAM');
+  const [audioSettings, setAudioSettings] = useState({
+    maxSpeakers: 10,
+    allowHandRaise: true,
+    autoPromoteSpeakers: false,
+    recordAudio: true
+  });
+
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
@@ -100,6 +109,16 @@ export function EventCreation({ onBack, onSuccess, circleId, isCircleExclusive =
       newErrors.pricePerPerson = 'Price cannot be negative';
     }
 
+    // PHASE 2: Validate audio settings for audio-only events
+    if (eventType === 'AUDIO_ONLY') {
+      if (audioSettings.maxSpeakers < 2) {
+        newErrors.audioSettings = 'Audio rooms must allow at least 2 speakers';
+      }
+      if (audioSettings.maxSpeakers > formData.maxParticipants) {
+        newErrors.audioSettings = 'Max speakers cannot exceed max participants';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -127,7 +146,10 @@ export function EventCreation({ onBack, onSuccess, circleId, isCircleExclusive =
         tags: formData.tags,
         isPublic: formData.isPublic,
         circleId: circleId, // Pass circle context
-        isCircleExclusive: circleId ? isCircleExclusive : undefined // Only set if in circle context
+        isCircleExclusive: circleId ? isCircleExclusive : undefined, // Only set if in circle context
+        // PHASE 2: Pass event type and audio settings
+        eventType: eventType,
+        audioSettings: eventType === 'AUDIO_ONLY' ? audioSettings : undefined
       });
       onSuccess();
     } catch (error) {
@@ -191,6 +213,128 @@ export function EventCreation({ onBack, onSuccess, circleId, isCircleExclusive =
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* PHASE 2: Event Type Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Event Type *
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setEventType('LIVE_STREAM')}
+              className={`p-4 border-2 rounded-lg transition-all ${
+                eventType === 'LIVE_STREAM' 
+                  ? 'border-accent bg-accent/5 ring-2 ring-accent/20' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex flex-col items-center">
+                <i className="fas fa-video text-3xl mb-2 text-accent"></i>
+                <div className="font-medium text-gray-800">Live Stream</div>
+                <div className="text-xs text-gray-600 mt-1">Video + Audio</div>
+              </div>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setEventType('AUDIO_ONLY')}
+              className={`p-4 border-2 rounded-lg transition-all ${
+                eventType === 'AUDIO_ONLY' 
+                  ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex flex-col items-center">
+                <i className="fas fa-microphone text-3xl mb-2 text-purple-600"></i>
+                <div className="font-medium text-gray-800">Audio Room</div>
+                <div className="text-xs text-gray-600 mt-1">Voice Only</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* PHASE 2: Audio Settings (show only for AUDIO_ONLY) */}
+        {eventType === 'AUDIO_ONLY' && (
+          <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg space-y-4">
+            <div className="flex items-center mb-2">
+              <i className="fas fa-cog text-purple-600 mr-2"></i>
+              <h4 className="font-medium text-purple-900">Audio Room Settings</h4>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Max Speakers
+              </label>
+              <input
+                type="number"
+                min="2"
+                max="50"
+                value={audioSettings.maxSpeakers}
+                onChange={(e) => setAudioSettings({
+                  ...audioSettings,
+                  maxSpeakers: parseInt(e.target.value) || 10
+                })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                Maximum number of people who can speak simultaneously
+              </p>
+            </div>
+            
+            <label className="flex items-start">
+              <input
+                type="checkbox"
+                checked={audioSettings.allowHandRaise}
+                onChange={(e) => setAudioSettings({
+                  ...audioSettings,
+                  allowHandRaise: e.target.checked
+                })}
+                className="mt-1 mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Allow listeners to raise hands</span>
+                <p className="text-xs text-gray-600">Listeners can request to speak</p>
+              </div>
+            </label>
+            
+            <label className="flex items-start">
+              <input
+                type="checkbox"
+                checked={audioSettings.autoPromoteSpeakers}
+                onChange={(e) => setAudioSettings({
+                  ...audioSettings,
+                  autoPromoteSpeakers: e.target.checked
+                })}
+                className="mt-1 mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Auto-promote hand raisers</span>
+                <p className="text-xs text-gray-600">Automatically promote listeners to speakers when they raise hands</p>
+              </div>
+            </label>
+
+            <label className="flex items-start">
+              <input
+                type="checkbox"
+                checked={audioSettings.recordAudio}
+                onChange={(e) => setAudioSettings({
+                  ...audioSettings,
+                  recordAudio: e.target.checked
+                })}
+                className="mt-1 mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Record audio session</span>
+                <p className="text-xs text-gray-600">Save the audio for later playback</p>
+              </div>
+            </label>
+
+            {errors.audioSettings && (
+              <p className="text-red-500 text-sm">{errors.audioSettings}</p>
+            )}
+          </div>
+        )}
+
         {/* Event Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

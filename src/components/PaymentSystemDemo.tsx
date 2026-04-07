@@ -67,6 +67,8 @@ export function PaymentSystemDemo() {
                   setIsGated={setIsGated}
                   priceAmount={priceAmount}
                   setPriceAmount={setPriceAmount}
+                  priceCurrency="USD"
+                  setPriceCurrency={() => {}}
                   contentType="article"
                 />
               </div>

@@ -30,7 +30,7 @@ export function WriteArticle({ onBack, onNavigate }: WriteArticleProps) {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const addContentToCourse = useMutation(api.courses.addContentToCourse);
   const myProfile = useQuery(api.profiles.getMyProfile);
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
   const myCourses = useQuery(api.courses.listCourses, { 
     authorId: myProfile?.userId,
     limit: 50 

@@ -19,7 +19,7 @@ export function CourseIndicator({ contentType, contentId, onNavigate }: CourseIn
   }
 
   // Show the first published course (since content can only be in one course now)
-  const courseInfo = coursesInfo.find(course => course.isPublished) || coursesInfo[0];
+  const courseInfo = coursesInfo.find(course => course?.isPublished) || coursesInfo[0];
 
   if (!courseInfo) {
     return null;

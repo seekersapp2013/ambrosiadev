@@ -21,7 +21,7 @@ export function EventPaymentFlow({ event, onSuccess, onCancel }: EventPaymentFlo
   const [errorMessage, setErrorMessage] = useState('');
 
   // Get wallet balance
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
   
   // Mutations
   const transferFunds = useMutation(api.wallets.transferFunds.transferFunds);
@@ -289,7 +289,7 @@ export function EventPaymentFlow({ event, onSuccess, onCancel }: EventPaymentFlo
         <div className="flex items-center justify-between mb-2">
           <span className="text-gray-600">Your {eventCurrency} Balance:</span>
           <span className={`font-bold ${balanceCheck.hasSufficient ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrencyAmount(walletBalance?.balances[eventCurrency] || 0, eventCurrency)}
+            {formatCurrencyAmount((walletBalance?.balances as any)?.[eventCurrency] || 0, eventCurrency)}
           </span>
         </div>
         

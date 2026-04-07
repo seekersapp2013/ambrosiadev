@@ -18,9 +18,9 @@ export function LearnScreen({ onNavigate }: LearnScreenProps) {
 
   // Combine articles and reels into unified content
   const content = courseContent ? [
-    ...courseContent.articles.map(article => ({ ...article, contentType: "article" as const })),
-    ...courseContent.reels.map(reel => ({ ...reel, contentType: "reel" as const }))
-  ].sort((a, b) => b.createdAt - a.createdAt) : undefined;
+    ...courseContent.articles.map((article: any) => ({ ...article, contentType: "article" as const })),
+    ...courseContent.reels.map((reel: any) => ({ ...reel, contentType: "reel" as const }))
+  ].sort((a: any, b: any) => b.createdAt - a.createdAt) : undefined;
 
   return (
     <div className="bg-gray-50 min-h-screen">

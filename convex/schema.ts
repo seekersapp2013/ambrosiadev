@@ -490,6 +490,10 @@ export default defineSchema({
     // New fields for 1-to-many bookings
     sessionType: v.string(), // "ONE_ON_ONE" | "ONE_TO_MANY"
     eventId: v.optional(v.id("events")), // Reference to event for 1-to-many bookings
+    // Audio room participant role (PHASE 1: Audio-only events)
+    participantRole: v.optional(v.string()), // "SPEAKER" | "LISTENER" (for audio-only events)
+    handRaised: v.optional(v.boolean()),
+    handRaisedAt: v.optional(v.number()),
     // LiveKit streaming fields
     liveStreamRoomName: v.optional(v.string()), // LiveKit room name
     liveStreamStatus: v.optional(v.string()), // "NOT_STARTED" | "LIVE" | "ENDED"
@@ -509,7 +513,8 @@ export default defineSchema({
     .index("by_session_type", ["sessionType"])
     .index("by_stream_status", ["liveStreamStatus"])
     .index("by_room_name", ["liveStreamRoomName"])
-    .index("by_currency", ["currency"]),
+    .index("by_currency", ["currency"])
+    .index("by_hand_raised", ["handRaised"]),
 
   // ✅ Events table for 1-to-many bookings
   events: defineTable({
@@ -530,6 +535,14 @@ export default defineSchema({
     // Circle integration fields
     circleId: v.optional(v.id("circles")), // Link event to a circle
     isCircleExclusive: v.optional(v.boolean()), // Only circle members can join
+    // Event type fields (PHASE 1: Audio-only events)
+    eventType: v.optional(v.string()), // "LIVE_STREAM" | "AUDIO_ONLY" (default: LIVE_STREAM for backward compatibility)
+    audioSettings: v.optional(v.object({
+      maxSpeakers: v.number(), // Max simultaneous speakers (default 10)
+      allowHandRaise: v.boolean(),
+      autoPromoteSpeakers: v.boolean(), // Auto-promote or require approval
+      recordAudio: v.boolean()
+    })),
     // LiveKit streaming fields
     liveStreamRoomName: v.optional(v.string()), // LiveKit room name
     liveStreamStatus: v.optional(v.string()), // "NOT_STARTED" | "LIVE" | "ENDED"
@@ -549,7 +562,8 @@ export default defineSchema({
     .index("by_stream_status", ["liveStreamStatus"])
     .index("by_room_name", ["liveStreamRoomName"])
     .index("by_circle", ["circleId"])
-    .index("by_currency", ["priceCurrency"]),
+    .index("by_currency", ["priceCurrency"])
+    .index("by_event_type", ["eventType"]),
 
   // ✅ Booking Settings table
   bookingSettings: defineTable({
@@ -815,5 +829,56 @@ export default defineSchema({
     updatedAt: v.optional(v.number())
   }).index("by_creator", ["creatorId"])
     .index("by_public", ["isPublic"])
+    .index("by_created", ["createdAt"]),
+
+  // ✅ Audio Room Participants table (PHASE 1: Audio-only events)
+  audioRoomParticipants: defineTable({
+    eventId: v.id("events"),
+    bookingId: v.id("bookings"),
+    userId: v.id("users"),
+    role: v.string(), // "HOST" | "SPEAKER" | "LISTENER"
+    isMuted: v.boolean(),
+    isSpeaking: v.boolean(),
+    handRaised: v.boolean(),
+    handRaisedAt: v.optional(v.number()),
+    joinedAt: v.number(),
+    lastActiveAt: v.number()
+  }).index("by_event", ["eventId"])
+    .index("by_event_user", ["eventId", "userId"])
+    .index("by_booking", ["bookingId"])
+    .index("by_role", ["role"])
+    .index("by_hand_raised", ["handRaised"])
+    .index("by_event_hand_raised", ["eventId", "handRaised"]),
+
+  // ✅ Referrals table (Expert-to-Expert patient referrals)
+  referrals: defineTable({
+    referringExpertId: v.id("users"), // Expert making the referral
+    patientId: v.id("users"), // Patient being referred
+    title: v.string(),
+    healthNote: v.string(), // Brief on patient's health challenges (only visible to selected expert)
+    suggestedExperts: v.array(v.id("users")), // 3+ experts suggested by referring expert
+    selectedExpertId: v.optional(v.id("users")), // Expert chosen by patient
+    status: v.string(), // "PENDING" | "ACCEPTED" | "COMPLETED" | "DECLINED"
+    declineReason: v.optional(v.string()), // If patient declines all suggestions
+    
+    // Booking details (once patient selects expert and books)
+    bookingId: v.optional(v.id("bookings")),
+    
+    // Commission tracking (10% to referring expert)
+    commissionRate: v.number(), // 0.10 for 10%
+    commissionAmount: v.optional(v.number()),
+    commissionCurrency: v.optional(v.string()),
+    commissionPaid: v.boolean(),
+    commissionTxId: v.optional(v.string()),
+    
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number())
+  }).index("by_referring_expert", ["referringExpertId"])
+    .index("by_patient", ["patientId"])
+    .index("by_selected_expert", ["selectedExpertId"])
+    .index("by_status", ["status"])
+    .index("by_booking", ["bookingId"])
+    .index("by_patient_status", ["patientId", "status"])
     .index("by_created", ["createdAt"])
 });

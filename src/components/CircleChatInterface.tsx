@@ -19,11 +19,11 @@ export function CircleChatInterface({ circleId, onBack, onNavigate }: CircleChat
   
   // Only fetch messages and pinned messages if user is a member
   const messages = useQuery(
-    circle?.isMember ? api.circleMessages.getMessages : "skip",
+    api.circleMessages.getMessages,
     circle?.isMember ? { circleId, limit: 50 } : "skip"
   );
   const pinnedMessages = useQuery(
-    circle?.isMember ? api.circleMessages.getPinnedMessages : "skip",
+    api.circleMessages.getPinnedMessages,
     circle?.isMember ? { circleId } : "skip"
   );
 
@@ -170,7 +170,7 @@ export function CircleChatInterface({ circleId, onBack, onNavigate }: CircleChat
             <p className="text-gray-600">Be the first to start the conversation!</p>
           </div>
         ) : (
-          messages.map((message) => (
+          messages.map((message: any) => (
             <div key={message._id} className="group">
               <div className="flex gap-3">
                 {/* Avatar */}
@@ -229,7 +229,7 @@ export function CircleChatInterface({ circleId, onBack, onNavigate }: CircleChat
                   {/* Reactions */}
                   {message.reactions && message.reactions.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {message.reactions.map((reaction) => (
+                      {message.reactions.map((reaction: any) => (
                         <button
                           key={reaction.emoji}
                           onClick={() => handleReaction(message._id, reaction.emoji)}

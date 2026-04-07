@@ -21,7 +21,7 @@ export function CreateCourse({ onBack, onNavigate }: CreateCourseProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createCourse = useMutation(api.courses.createCourse);
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
 
   const categories = [
     "Technology",

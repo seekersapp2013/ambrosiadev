@@ -3,6 +3,7 @@ import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { LiveStreamRoom } from './LiveStreamRoom';
+import { AudioRoomView } from './AudioRoomView';
 
 interface LiveStreamJoinProps {
     bookingId: Id<"bookings">;
@@ -57,12 +58,22 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
         token: string;
         wsUrl: string;
         roomName: string;
+        role?: "HOST" | "SPEAKER" | "LISTENER"; // For audio-only events
     } | null>(null);
 
     const booking = useQuery(api.livekit.getBookingForStream, { bookingId });
     const createRoom = useMutation(api.livekit.createLiveStreamRoom);
     const generateToken = useAction(api.livekitActions.generateAccessToken);
+    const generateAudioToken = useAction(api.livekitActions.generateAudioEventToken);
     const testConnection = useAction(api.livekitActions.testLiveKitConnection);
+
+    // Get event details if this is an event booking
+    const event = useQuery(
+        api.events.getEventById,
+        booking?.eventId ? { eventId: booking.eventId } : "skip"
+    );
+
+    const isAudioOnlyEvent = event?.eventType === "AUDIO_ONLY";
 
     const handleJoinStream = async (isRetry = false) => {
         if (!booking || isJoining) return;
@@ -77,6 +88,7 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
         try {
             console.log('Starting join process for booking:', bookingId);
             console.log('Current booking data:', booking);
+            console.log('Is audio-only event:', isAudioOnlyEvent);
 
             // Add timeout for the entire join process
             const joinTimeout = new Promise<never>((_, reject) => {
@@ -88,17 +100,14 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
                 console.log('Creating new room...');
                 await createRoom({ bookingId });
                 // Refetch booking data to get the room name
-                // Note: In a real app, you might want to wait for the booking to update
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
-            // Determine user role - fallback to checking user IDs if isProvider is not set
+            // Determine user role
             let isProvider = booking.isProvider;
             if (isProvider === undefined || isProvider === null) {
-                // Fallback: try to determine from current user context
-                // This is a temporary solution - ideally the backend should provide this
                 console.warn('isProvider not set in booking data, using fallback logic');
-                isProvider = false; // Default to client for safety
+                isProvider = false;
             }
 
             const participantName = isProvider
@@ -109,21 +118,42 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
                 participantName,
                 isProvider,
                 bookingId,
-                roomName: booking.liveStreamRoomName
+                roomName: booking.liveStreamRoomName,
+                isAudioOnly: isAudioOnlyEvent
             });
 
-            const tokenData = await Promise.race([
-                generateToken({
-                    bookingId,
-                    participantName
-                }),
-                joinTimeout
-            ]);
+            let tokenData: {
+                token: string;
+                wsUrl: string;
+                roomName: string;
+                role?: "HOST" | "SPEAKER" | "LISTENER";
+            };
+
+            // Use different token generation for audio-only events
+            if (isAudioOnlyEvent && event) {
+                tokenData = await Promise.race([
+                    generateAudioToken({
+                        eventId: event._id,
+                        bookingId,
+                        participantName
+                    }),
+                    joinTimeout
+                ]) as any;
+            } else {
+                tokenData = await Promise.race([
+                    generateToken({
+                        bookingId,
+                        participantName
+                    }),
+                    joinTimeout
+                ]) as any;
+            }
 
             console.log('Token generated successfully:', {
                 wsUrl: tokenData.wsUrl,
                 roomName: tokenData.roomName,
-                tokenLength: tokenData.token.length
+                tokenLength: tokenData.token.length,
+                role: tokenData.role || 'N/A'
             });
 
             setStreamData(tokenData);
@@ -217,7 +247,7 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
         );
     }
 
-    // If already in stream, show the room
+    // If already in stream, show the appropriate room
     if (streamData) {
         // Determine if current user is provider or client
         const isProvider = booking.isProvider || false;
@@ -225,6 +255,25 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
             ? (booking.provider?.name || 'Provider')
             : (booking.client?.name || 'Client');
 
+        // Render AudioRoomView for audio-only events
+        if (isAudioOnlyEvent && event) {
+            const userRole = streamData.role || (isProvider ? "HOST" : "LISTENER");
+            
+            return (
+                <AudioRoomView
+                    eventId={event._id}
+                    bookingId={bookingId}
+                    token={streamData.token}
+                    wsUrl={streamData.wsUrl}
+                    roomName={streamData.roomName}
+                    participantName={participantName}
+                    userRole={userRole}
+                    onLeave={handleLeaveStream}
+                />
+            );
+        }
+
+        // Render LiveStreamRoom for video events
         return (
             <LiveStreamRoom
                 bookingId={bookingId}
@@ -280,12 +329,15 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     {/* Header */}
                     <div className="text-center mb-6">
-                        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i className="fas fa-video text-2xl text-blue-600"></i>
+                        <div className={`w-16 h-16 ${isAudioOnlyEvent ? 'bg-purple-100' : 'bg-blue-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                            <i className={`fas ${isAudioOnlyEvent ? 'fa-microphone' : 'fa-video'} text-2xl ${isAudioOnlyEvent ? 'text-purple-600' : 'text-blue-600'}`}></i>
                         </div>
                         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                            Join Live Session
+                            {isAudioOnlyEvent ? 'Join Audio Room' : 'Join Live Session'}
                         </h2>
+                        {isAudioOnlyEvent && (
+                            <p className="text-purple-600 text-sm">Voice Only • No Video</p>
+                        )}
                     </div>
 
                     {/* Session Details */}
@@ -384,7 +436,7 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
                                 <button
                                     onClick={() => handleJoinStream(false)}
                                     disabled={isJoining}
-                                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                    className={`w-full ${isAudioOnlyEvent ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-3 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
                                 >
                                     {isJoining ? (
                                         <>
@@ -393,8 +445,8 @@ export function LiveStreamJoin({ bookingId, onBack }: LiveStreamJoinProps) {
                                         </>
                                     ) : (
                                         <>
-                                            <i className="fas fa-video mr-2"></i>
-                                            {connectionError ? 'Try Again' : 'Join Live Session'}
+                                            <i className={`fas ${isAudioOnlyEvent ? 'fa-microphone' : 'fa-video'} mr-2`}></i>
+                                            {connectionError ? 'Try Again' : (isAudioOnlyEvent ? 'Join Audio Room' : 'Join Live Session')}
                                         </>
                                     )}
                                 </button>

@@ -17,7 +17,7 @@ export function CircleDetailView({ circleId, onNavigate, onBack }: CircleDetailV
   
   // Only fetch members if user is a member (for preview)
   const members = useQuery(
-    circle?.isMember ? api.circleMembers.getCircleMembers : "skip",
+    api.circleMembers.getCircleMembers,
     circle?.isMember ? { circleId, limit: 10 } : "skip"
   );
   
@@ -217,7 +217,7 @@ export function CircleDetailView({ circleId, onNavigate, onBack }: CircleDetailV
               </button>
             </div>
             <div className="space-y-3">
-              {members.members.slice(0, 5).map((member) => (
+              {members.members.slice(0, 5).map((member: any) => (
                 <div key={member._id} className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
                     {member.profile.avatar ? (
@@ -292,7 +292,7 @@ export function CircleDetailView({ circleId, onNavigate, onBack }: CircleDetailV
           ) : (
             <button
               onClick={handleJoinCircle}
-              disabled={isJoining || (circle.maxMembers && circle.currentMembers >= circle.maxMembers)}
+              disabled={isJoining || !!(circle.maxMembers && circle.currentMembers >= circle.maxMembers)}
               className="w-full bg-accent text-white py-4 rounded-lg hover:bg-accent/90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isJoining ? (

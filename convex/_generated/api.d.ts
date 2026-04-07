@@ -50,6 +50,7 @@ import type * as payments from "../payments.js";
 import type * as profileQueries from "../profileQueries.js";
 import type * as profiles from "../profiles.js";
 import type * as reels from "../reels.js";
+import type * as referrals from "../referrals.js";
 import type * as scheduledJobs from "../scheduledJobs.js";
 import type * as search from "../search.js";
 import type * as streamComments from "../streamComments.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   profileQueries: typeof profileQueries;
   profiles: typeof profiles;
   reels: typeof reels;
+  referrals: typeof referrals;
   scheduledJobs: typeof scheduledJobs;
   search: typeof search;
   streamComments: typeof streamComments;

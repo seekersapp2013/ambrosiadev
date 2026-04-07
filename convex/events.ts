@@ -18,7 +18,15 @@ export const createEvent = mutation({
     tags: v.optional(v.array(v.string())),
     isPublic: v.optional(v.boolean()),
     circleId: v.optional(v.id("circles")), // Link to circle
-    isCircleExclusive: v.optional(v.boolean()) // Only circle members can join
+    isCircleExclusive: v.optional(v.boolean()), // Only circle members can join
+    // PHASE 1: Audio-only event fields
+    eventType: v.optional(v.string()), // "LIVE_STREAM" | "AUDIO_ONLY"
+    audioSettings: v.optional(v.object({
+      maxSpeakers: v.number(),
+      allowHandRaise: v.boolean(),
+      autoPromoteSpeakers: v.boolean(),
+      recordAudio: v.boolean()
+    }))
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -121,6 +129,20 @@ export const createEvent = mutation({
 
     const now = Date.now();
 
+    // Validate audio settings for audio-only events
+    const eventType = args.eventType || "LIVE_STREAM";
+    if (eventType === "AUDIO_ONLY") {
+      if (!args.audioSettings) {
+        throw new Error("Audio settings are required for audio-only events");
+      }
+      if (args.audioSettings.maxSpeakers < 2) {
+        throw new Error("Audio rooms must allow at least 2 speakers");
+      }
+      if (args.audioSettings.maxSpeakers > args.maxParticipants) {
+        throw new Error("Max speakers cannot exceed max participants");
+      }
+    }
+
     // Create event
     const eventId = await ctx.db.insert("events", {
       providerId: userId,
@@ -139,6 +161,8 @@ export const createEvent = mutation({
       isPublic: args.isPublic ?? true,
       circleId: args.circleId,
       isCircleExclusive: args.isCircleExclusive ?? false,
+      eventType: eventType,
+      audioSettings: args.audioSettings,
       createdAt: now
     });
 
@@ -717,5 +741,466 @@ export const getCircleEvents = query({
       hasMore: offset + limit < allEvents.length,
       total: allEvents.length
     };
+  }
+});
+
+
+// ============================================
+// PHASE 1: Audio Room Management Functions
+// ============================================
+
+// Raise hand in audio room
+export const raiseHand = mutation({
+  args: {
+    bookingId: v.id("bookings")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("Booking not found");
+    }
+
+    // Only the booking owner can raise their hand
+    if (booking.clientId !== userId) {
+      throw new Error("Not authorized");
+    }
+
+    // Update booking with hand raised
+    await ctx.db.patch(args.bookingId, {
+      handRaised: true,
+      handRaisedAt: Date.now(),
+      updatedAt: Date.now()
+    });
+
+    // Update audio room participant state
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
+      .first();
+
+    if (participant) {
+      await ctx.db.patch(participant._id, {
+        handRaised: true,
+        handRaisedAt: Date.now(),
+        lastActiveAt: Date.now()
+      });
+    }
+
+    return { success: true };
+  }
+});
+
+// Lower hand in audio room
+export const lowerHand = mutation({
+  args: {
+    bookingId: v.id("bookings")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("Booking not found");
+    }
+
+    // Only the booking owner can lower their hand
+    if (booking.clientId !== userId) {
+      throw new Error("Not authorized");
+    }
+
+    // Update booking
+    await ctx.db.patch(args.bookingId, {
+      handRaised: false,
+      handRaisedAt: undefined,
+      updatedAt: Date.now()
+    });
+
+    // Update audio room participant state
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
+      .first();
+
+    if (participant) {
+      await ctx.db.patch(participant._id, {
+        handRaised: false,
+        handRaisedAt: undefined,
+        lastActiveAt: Date.now()
+      });
+    }
+
+    return { success: true };
+  }
+});
+
+// Promote listener to speaker (host only)
+export const promoteToSpeaker = mutation({
+  args: {
+    eventId: v.id("events"),
+    targetUserId: v.id("users")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const event = await ctx.db.get(args.eventId);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    // Only event host can promote
+    if (event.providerId !== userId) {
+      throw new Error("Only the event host can promote participants");
+    }
+
+    // Check if event is audio-only
+    if (event.eventType !== "AUDIO_ONLY") {
+      throw new Error("This action is only available for audio-only events");
+    }
+
+    // Check max speakers limit
+    const audioSettings = event.audioSettings;
+    if (audioSettings) {
+      const currentSpeakers = await ctx.db
+        .query("audioRoomParticipants")
+        .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+        .filter((q) => q.or(
+          q.eq(q.field("role"), "SPEAKER"),
+          q.eq(q.field("role"), "HOST")
+        ))
+        .collect();
+
+      if (currentSpeakers.length >= audioSettings.maxSpeakers) {
+        throw new Error(`Maximum number of speakers (${audioSettings.maxSpeakers}) reached`);
+      }
+    }
+
+    // Find target participant
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_user", (q) => 
+        q.eq("eventId", args.eventId).eq("userId", args.targetUserId)
+      )
+      .first();
+
+    if (!participant) {
+      throw new Error("Participant not found in audio room");
+    }
+
+    // Update participant role to SPEAKER
+    await ctx.db.patch(participant._id, {
+      role: "SPEAKER",
+      handRaised: false,
+      handRaisedAt: undefined,
+      lastActiveAt: Date.now()
+    });
+
+    // Update booking
+    const booking = await ctx.db.get(participant.bookingId);
+    if (booking) {
+      await ctx.db.patch(participant.bookingId, {
+        participantRole: "SPEAKER",
+        handRaised: false,
+        handRaisedAt: undefined,
+        updatedAt: Date.now()
+      });
+    }
+
+    return { success: true };
+  }
+});
+
+// Demote speaker to listener (host only)
+export const demoteToListener = mutation({
+  args: {
+    eventId: v.id("events"),
+    targetUserId: v.id("users")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const event = await ctx.db.get(args.eventId);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    // Only event host can demote
+    if (event.providerId !== userId) {
+      throw new Error("Only the event host can demote participants");
+    }
+
+    // Check if event is audio-only
+    if (event.eventType !== "AUDIO_ONLY") {
+      throw new Error("This action is only available for audio-only events");
+    }
+
+    // Find target participant
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_user", (q) => 
+        q.eq("eventId", args.eventId).eq("userId", args.targetUserId)
+      )
+      .first();
+
+    if (!participant) {
+      throw new Error("Participant not found in audio room");
+    }
+
+    // Can't demote the host
+    if (participant.role === "HOST") {
+      throw new Error("Cannot demote the event host");
+    }
+
+    // Update participant role to LISTENER
+    await ctx.db.patch(participant._id, {
+      role: "LISTENER",
+      isMuted: true, // Listeners are muted by default
+      lastActiveAt: Date.now()
+    });
+
+    // Update booking
+    const booking = await ctx.db.get(participant.bookingId);
+    if (booking) {
+      await ctx.db.patch(participant.bookingId, {
+        participantRole: "LISTENER",
+        updatedAt: Date.now()
+      });
+    }
+
+    return { success: true };
+  }
+});
+
+// Get audio room state
+export const getAudioRoomState = query({
+  args: {
+    eventId: v.id("events")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    
+    const event = await ctx.db.get(args.eventId);
+    if (!event) {
+      return null;
+    }
+
+    // Get all participants
+    const participants = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+      .collect();
+
+    // Get user profiles for each participant
+    const participantsWithProfiles = await Promise.all(
+      participants.map(async (participant) => {
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", participant.userId))
+          .first();
+
+        return {
+          ...participant,
+          profile: {
+            name: profile?.name,
+            username: profile?.username,
+            avatar: profile?.avatar
+          }
+        };
+      })
+    );
+
+    // Separate by role
+    const host = participantsWithProfiles.find(p => p.role === "HOST");
+    const speakers = participantsWithProfiles.filter(p => p.role === "SPEAKER");
+    const listeners = participantsWithProfiles.filter(p => p.role === "LISTENER");
+    const handRaisedUsers = participantsWithProfiles.filter(p => p.handRaised);
+
+    return {
+      event,
+      participants: participantsWithProfiles,
+      host,
+      speakers,
+      listeners,
+      handRaisedUsers,
+      totalParticipants: participants.length,
+      isUserHost: userId === event.providerId
+    };
+  }
+});
+
+// Get users with raised hands
+export const getHandRaisedUsers = query({
+  args: {
+    eventId: v.id("events")
+  },
+  handler: async (ctx, args) => {
+    const participants = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_hand_raised", (q) => 
+        q.eq("eventId", args.eventId).eq("handRaised", true)
+      )
+      .collect();
+
+    // Get user profiles
+    const usersWithProfiles = await Promise.all(
+      participants.map(async (participant) => {
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", participant.userId))
+          .first();
+
+        return {
+          userId: participant.userId,
+          bookingId: participant.bookingId,
+          handRaisedAt: participant.handRaisedAt,
+          profile: {
+            name: profile?.name,
+            username: profile?.username,
+            avatar: profile?.avatar
+          }
+        };
+      })
+    );
+
+    // Sort by hand raised time (oldest first)
+    return usersWithProfiles.sort((a, b) => 
+      (a.handRaisedAt || 0) - (b.handRaisedAt || 0)
+    );
+  }
+});
+
+// Initialize audio room participant (called when joining)
+export const initializeAudioRoomParticipant = mutation({
+  args: {
+    eventId: v.id("events"),
+    bookingId: v.id("bookings")
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const event = await ctx.db.get(args.eventId);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) {
+      throw new Error("Booking not found");
+    }
+
+    // Check if participant already exists
+    const existing = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_user", (q) => 
+        q.eq("eventId", args.eventId).eq("userId", userId)
+      )
+      .first();
+
+    if (existing) {
+      // Update last active time
+      await ctx.db.patch(existing._id, {
+        lastActiveAt: Date.now()
+      });
+      return { participantId: existing._id, role: existing.role };
+    }
+
+    // Determine role
+    const isHost = event.providerId === userId;
+    const role = isHost ? "HOST" : (booking.participantRole || "LISTENER");
+
+    // Create new participant
+    const participantId = await ctx.db.insert("audioRoomParticipants", {
+      eventId: args.eventId,
+      bookingId: args.bookingId,
+      userId,
+      role,
+      isMuted: role === "LISTENER", // Listeners start muted
+      isSpeaking: false,
+      handRaised: false,
+      joinedAt: Date.now(),
+      lastActiveAt: Date.now()
+    });
+
+    return { participantId, role };
+  }
+});
+
+// Update participant speaking status
+export const updateSpeakingStatus = mutation({
+  args: {
+    eventId: v.id("events"),
+    isSpeaking: v.boolean()
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_user", (q) => 
+        q.eq("eventId", args.eventId).eq("userId", userId)
+      )
+      .first();
+
+    if (!participant) {
+      throw new Error("Participant not found");
+    }
+
+    await ctx.db.patch(participant._id, {
+      isSpeaking: args.isSpeaking,
+      lastActiveAt: Date.now()
+    });
+
+    return { success: true };
+  }
+});
+
+// Update participant muted status
+export const updateMutedStatus = mutation({
+  args: {
+    eventId: v.id("events"),
+    isMuted: v.boolean()
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const participant = await ctx.db
+      .query("audioRoomParticipants")
+      .withIndex("by_event_user", (q) => 
+        q.eq("eventId", args.eventId).eq("userId", userId)
+      )
+      .first();
+
+    if (!participant) {
+      throw new Error("Participant not found");
+    }
+
+    await ctx.db.patch(participant._id, {
+      isMuted: args.isMuted,
+      lastActiveAt: Date.now()
+    });
+
+    return { success: true };
   }
 });

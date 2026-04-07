@@ -30,7 +30,7 @@ export function GatedContentPaywall({
     const [errorMessage, setErrorMessage] = useState("");
 
     const myProfile = useQuery(api.profiles.getMyProfile);
-    const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+    const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
     const purchaseContent = useMutation(api.payments.purchaseContent);
 
     // Get currency info
@@ -45,7 +45,8 @@ export function GatedContentPaywall({
     ) : { hasSufficient: false, availableCurrencies: [] };
 
     const userPrimaryCurrency = walletBalance?.primaryCurrency || "USD";
-    const primaryCurrencyBalance = walletBalance?.balances[userPrimaryCurrency] || 0;
+    const balances: any = walletBalance?.balances || {};
+    const primaryCurrencyBalance = balances[userPrimaryCurrency] || 0;
 
     // Convert price to user's primary currency for display
     let convertedPrice = price;
@@ -230,7 +231,7 @@ export function GatedContentPaywall({
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-gray-600">Your {contentCurrency} Balance:</span>
                         <span className={`font-bold ${balanceCheck.hasSufficient ? 'text-green-600' : 'text-red-600'}`}>
-                            {currencyInfo?.symbol}{(walletBalance?.balances[contentCurrency] || 0).toFixed(2)}
+                            {currencyInfo?.symbol}{(balances[contentCurrency] || 0).toFixed(2)}
                         </span>
                     </div>
                     

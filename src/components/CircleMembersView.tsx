@@ -16,7 +16,7 @@ export function CircleMembersView({ circleId, onBack }: CircleMembersViewProps) 
   
   // Only fetch members if user is a member
   const members = useQuery(
-    circle?.isMember ? api.circleMembers.getCircleMembers : "skip",
+    api.circleMembers.getCircleMembers,
     circle?.isMember ? { circleId, limit: 100 } : "skip"
   );
 
@@ -82,7 +82,7 @@ export function CircleMembersView({ circleId, onBack }: CircleMembersViewProps) 
 
   const isAdmin = circle.membership && ['CREATOR', 'ADMIN'].includes(circle.membership.role);
 
-  const filteredMembers = members.members.filter(member =>
+  const filteredMembers = members.members.filter((member: any) =>
     member.profile.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.profile.username?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -128,7 +128,7 @@ export function CircleMembersView({ circleId, onBack }: CircleMembersViewProps) 
 
         {/* Members List */}
         <div className="space-y-3">
-          {filteredMembers.map((member) => (
+          {filteredMembers.map((member: any) => (
             <div
               key={member._id}
               className="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow"

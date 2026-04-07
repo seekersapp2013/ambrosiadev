@@ -3,7 +3,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { AccessToken, EgressClient } from "livekit-server-sdk";
+import { AccessToken, EgressClient, TrackSource } from "livekit-server-sdk";
 import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 
@@ -506,6 +506,106 @@ export const testLiveKitConnection = action({
                     timestamp: Date.now()
                 }
             };
+        }
+    }
+});
+
+
+// ============================================
+// PHASE 1: Audio-Only Event Token Generation
+// ============================================
+
+// Generate access token for audio-only events
+export const generateAudioEventToken = action({
+    args: {
+        eventId: v.id("events"),
+        bookingId: v.id("bookings"),
+        participantName: v.string()
+    },
+    handler: async (ctx: ActionCtx, args): Promise<{ token: string; wsUrl: string; roomName: string; role: string }> => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) {
+            throw new Error("Not authenticated");
+        }
+
+        // Get event details
+        const event: any = await ctx.runQuery(internal.livekit.getBookingForStreamInternal, {
+            bookingId: args.bookingId
+        });
+
+        if (!event) {
+            throw new Error("Event not found");
+        }
+
+        const booking: any = await ctx.runQuery(internal.livekit.getBookingForStreamInternal, {
+            bookingId: args.bookingId
+        });
+
+        if (!booking) {
+            throw new Error("Booking not found");
+        }
+
+        // Verify user is authorized
+        if (booking.clientId !== userId && booking.providerId !== userId) {
+            throw new Error("Not authorized to join this event");
+        }
+
+        if (!booking.liveStreamRoomName) {
+            throw new Error("Audio room not created");
+        }
+
+        try {
+            validateLiveKitConfig();
+
+            // Determine participant role
+            const isHost = booking.providerId === userId;
+            const participantRole = booking.participantRole || (isHost ? "HOST" : "LISTENER");
+
+            // Create access token
+            const at: AccessToken = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+                identity: userId,
+                name: args.participantName,
+                ttl: '2h',
+                metadata: JSON.stringify({ role: participantRole })
+            });
+
+            // Grant permissions based on role
+            // For audio-only events:
+            // - HOST and SPEAKER can publish audio
+            // - LISTENER can only subscribe
+            const canPublish = participantRole === "HOST" || participantRole === "SPEAKER";
+
+            at.addGrant({
+                roomJoin: true,
+                room: booking.liveStreamRoomName,
+                canPublish: canPublish,
+                canPublishSources: canPublish ? [TrackSource.MICROPHONE] : [], // Only audio, no video
+                canSubscribe: true,
+                canPublishData: true, // For hand-raise signals
+                canUpdateOwnMetadata: true,
+                recorder: isHost
+            });
+
+            const token: string = await at.toJwt();
+
+            console.log('Generated audio event token:', {
+                userId,
+                participantName: args.participantName,
+                roomName: booking.liveStreamRoomName,
+                role: participantRole,
+                canPublish,
+                wsUrl: LIVEKIT_WS_URL
+            });
+
+            return { 
+                token, 
+                wsUrl: LIVEKIT_WS_URL!, 
+                roomName: booking.liveStreamRoomName,
+                role: participantRole
+            };
+        } catch (error: any) {
+            console.error('Failed to generate audio event token:', error);
+            throw new Error(`Failed to generate access token: ${error?.message || 'Unknown error'}`);
         }
     }
 });

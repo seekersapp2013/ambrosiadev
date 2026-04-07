@@ -9,6 +9,7 @@ interface BookingDetails {
   sessionDate: string;
   sessionTime: string;
   duration?: number;
+  referralId?: Id<"referrals">; // Optional referral ID
 }
 
 interface BookingPaymentFlowProps {

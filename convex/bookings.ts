@@ -793,6 +793,87 @@ export const stopSession = mutation({
       });
     }
 
+    // Check if this booking is linked to a referral and complete it with commission
+    const referral = await ctx.db
+      .query("referrals")
+      .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
+      .first();
+
+    if (referral && referral.status === "ACCEPTED" && !referral.commissionPaid && referral.commissionAmount && referral.commissionCurrency) {
+      try {
+        // Get or create referring expert's wallet
+        let referringExpertWallet = await ctx.db
+          .query("wallets")
+          .withIndex("userId", (q) => q.eq("userId", referral.referringExpertId))
+          .first();
+
+        if (!referringExpertWallet) {
+          const walletId = await ctx.db.insert("wallets", {
+            userId: referral.referringExpertId,
+            primaryCurrency: "USD",
+            phoneCountryDetected: false,
+            balances: {
+              USD: 0,
+              NGN: 0,
+              GBP: 0,
+              EUR: 0,
+              CAD: 0,
+              GHS: 0,
+              KES: 0,
+              GMD: 0,
+              ZAR: 0,
+            },
+            createdAt: Date.now(),
+          });
+          referringExpertWallet = await ctx.db.get(walletId);
+        }
+
+        if (referringExpertWallet) {
+          const now = Date.now();
+          const newBalances = { ...referringExpertWallet.balances };
+          const currency = referral.commissionCurrency as keyof typeof newBalances;
+          newBalances[currency] += referral.commissionAmount;
+
+          await ctx.db.patch(referringExpertWallet._id, {
+            balances: newBalances,
+            updatedAt: now,
+          });
+
+          // Create commission transaction record
+          const txId = `referral-commission-${referral._id}-${now}`;
+          await ctx.db.insert("transactions", {
+            id: txId,
+            toUserId: referral.referringExpertId,
+            fromUserId: referral.selectedExpertId,
+            amount: referral.commissionAmount,
+            currency: referral.commissionCurrency,
+            type: "transfer",
+            status: "completed",
+            description: `Referral commission for: ${referral.title}`,
+            metadata: {
+              referralId: referral._id,
+              bookingId: referral.bookingId,
+              commissionRate: referral.commissionRate,
+            },
+            createdAt: now,
+            completedAt: now,
+          });
+
+          // Update referral
+          await ctx.db.patch(referral._id, {
+            status: "COMPLETED",
+            commissionPaid: true,
+            commissionTxId: txId,
+            completedAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to complete referral commission:", error);
+        // Don't fail the session stop if referral completion fails
+      }
+    }
+
     return { success: true };
   }
 });

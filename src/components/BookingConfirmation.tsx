@@ -9,6 +9,7 @@ interface BookingDetails {
   sessionDate: string;
   sessionTime: string;
   duration?: number;
+  referralId?: Id<"referrals">;
 }
 
 interface BookingConfirmationProps {
@@ -36,6 +37,7 @@ export function BookingConfirmation({ bookingDetails, onConfirm, onCancel }: Boo
 
   // Mutations
   const createBooking = useMutation(api.bookings.createBooking);
+  const linkBookingToReferral = useMutation(api.referrals.linkBookingToReferral);
 
   if (!provider || !providerProfile) {
     return (
@@ -57,6 +59,19 @@ export function BookingConfirmation({ bookingDetails, onConfirm, onCancel }: Boo
         duration,
         paymentTxHash: "automated_payment"
       });
+
+      // Link booking to referral if this is from a referral
+      if (bookingDetails.referralId) {
+        try {
+          await linkBookingToReferral({
+            referralId: bookingDetails.referralId,
+            bookingId,
+          });
+        } catch (error) {
+          console.error('Error linking booking to referral:', error);
+          // Don't fail the booking if referral linking fails
+        }
+      }
 
       onConfirm(bookingId);
     } catch (err) {

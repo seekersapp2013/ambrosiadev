@@ -30,7 +30,7 @@ export function EnhancedPaywall({
     contentId,
   });
 
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
   const purchaseContent = useMutation(api.payments.purchaseContent);
 
   if (!purchaseOptions) {
@@ -56,7 +56,7 @@ export function EnhancedPaywall({
           priceAmount: purchaseOptions.individualPrice,
         });
       } else if (option === 'course' && selectedCourseId) {
-        const courseOption = purchaseOptions.courseOptions.find(c => c.courseId === selectedCourseId);
+        const courseOption = purchaseOptions.courseOptions.find((c: any) => c.courseId === selectedCourseId);
         if (courseOption) {
           await purchaseContent({
             contentType: 'course',
@@ -158,7 +158,7 @@ export function EnhancedPaywall({
           <div className="space-y-3">
             <h5 className="font-medium text-gray-700 text-sm">Or get more value with a course:</h5>
             
-            {purchaseOptions.courseOptions.map((courseOption) => (
+            {purchaseOptions.courseOptions.map((courseOption: any) => (
               <div
                 key={courseOption.courseId}
                 className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
@@ -243,9 +243,9 @@ export function EnhancedPaywall({
             disabled={
               isProcessing || 
               (selectedOption === 'individual' && !canAfford(purchaseOptions.individualPrice, purchaseOptions.individualCurrency)) ||
-              (selectedOption === 'course' && selectedCourseId && !canAfford(
-                purchaseOptions.courseOptions.find(c => c.courseId === selectedCourseId)?.coursePrice || 0,
-                purchaseOptions.courseOptions.find(c => c.courseId === selectedCourseId)?.courseCurrency || ''
+              !!(selectedOption === 'course' && selectedCourseId && !canAfford(
+                purchaseOptions.courseOptions.find((c: any) => c.courseId === selectedCourseId)?.coursePrice || 0,
+                purchaseOptions.courseOptions.find((c: any) => c.courseId === selectedCourseId)?.courseCurrency || ''
               ))
             }
             className="w-full bg-accent text-white py-3 px-4 rounded-lg font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"

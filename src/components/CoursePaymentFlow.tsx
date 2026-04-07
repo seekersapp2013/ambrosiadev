@@ -22,7 +22,7 @@ export function CoursePaymentFlow({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const course = useQuery(api.courses.getCourse, { courseId });
-  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance);
+  const walletBalance = useQuery(api.wallets.getWalletBalance.getWalletBalance, {});
   const purchaseContent = useMutation(api.payments.purchaseContent);
 
   if (!course) {

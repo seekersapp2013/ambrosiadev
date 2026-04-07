@@ -3,12 +3,13 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { LiveStreamJoin } from './LiveStreamJoin';
+import { ReferralCreationForm } from './ReferralCreationForm';
 
 interface BookingManagementProps {
     onBack: () => void;
 }
 
-type ViewMode = 'my-bookings' | 'provider-bookings' | 'live-stream';
+type ViewMode = 'my-bookings' | 'provider-bookings' | 'live-stream' | 'create-referral';
 type StatusFilter = 'all' | 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 
 // Helper component to display provider avatar
@@ -55,6 +56,7 @@ export function BookingManagement({ onBack }: BookingManagementProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('my-bookings');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [selectedBookingForStream, setSelectedBookingForStream] = useState<Id<"bookings"> | null>(null);
+    const [selectedPatientForReferral, setSelectedPatientForReferral] = useState<Id<"users"> | null>(null);
 
     // Check if user is a provider
     const mySubscription = useQuery(api.bookingSubscribers.getMySubscription);
@@ -192,6 +194,32 @@ export function BookingManagement({ onBack }: BookingManagementProps) {
         setSelectedBookingForStream(null);
         setViewMode('my-bookings');
     };
+    
+    const handleReferPatient = (patientId: Id<"users">) => {
+        setSelectedPatientForReferral(patientId);
+        setViewMode('create-referral');
+    };
+    
+    const handleReferralSuccess = () => {
+        setSelectedPatientForReferral(null);
+        setViewMode('provider-bookings');
+    };
+    
+    const handleBackFromReferral = () => {
+        setSelectedPatientForReferral(null);
+        setViewMode('provider-bookings');
+    };
+
+    // Show referral creation form
+    if (viewMode === 'create-referral' && selectedPatientForReferral) {
+        return (
+            <ReferralCreationForm
+                patientId={selectedPatientForReferral}
+                onBack={handleBackFromReferral}
+                onSuccess={handleReferralSuccess}
+            />
+        );
+    }
 
     // Show live stream view if selected
     if (viewMode === 'live-stream' && selectedBookingForStream) {
@@ -407,6 +435,17 @@ export function BookingManagement({ onBack }: BookingManagementProps) {
                                                             </button>
                                                         )}
                                                     </>
+                                                )}
+                                                
+                                                {/* Refer Patient Button (for completed bookings) */}
+                                                {viewMode === 'provider-bookings' && booking.status === 'COMPLETED' && (
+                                                    <button
+                                                        onClick={() => handleReferPatient(booking.clientId)}
+                                                        className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
+                                                    >
+                                                        <i className="fas fa-user-md"></i>
+                                                        <span>Refer Patient</span>
+                                                    </button>
                                                 )}
 
                                                 <div className="flex space-x-2">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { ProviderList } from './ProviderList';
@@ -16,18 +16,21 @@ import { EventJoinFlow } from './EventJoinFlow';
 import { LiveStreamJoin } from './LiveStreamJoin';
 import { RecordingManagement } from './RecordingManagement';
 import { ExpertRequestsList } from './ExpertRequestsList';
+import { PatientReferralsList } from './PatientReferralsList';
+import { ExpertReferralsList } from './ExpertReferralsList';
 
 interface BookingScreenProps {
   onBack: () => void;
 }
 
-type ViewMode = 'main' | 'subscribe' | 'provider-details' | 'calendar' | 'payment' | 'settings' | 'success' | 'my-bookings' | 'create-event' | 'my-events' | 'event-join' | 'recordings';
+type ViewMode = 'main' | 'subscribe' | 'provider-details' | 'calendar' | 'payment' | 'settings' | 'success' | 'my-bookings' | 'create-event' | 'my-events' | 'event-join' | 'recordings' | 'my-referrals' | 'expert-referrals';
 
 interface BookingDetails {
   providerId: Id<"users">;
   sessionDate: string;
   sessionTime: string;
   duration?: number;
+  referralId?: Id<"referrals">;
 }
 
 export function BookingScreen({ onBack }: BookingScreenProps) {
@@ -36,9 +39,12 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
   const [selectedEventId, setSelectedEventId] = useState<Id<"events"> | null>(null);
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
   const [completedBookingId, setCompletedBookingId] = useState<Id<"bookings"> | null>(null);
+  const [selectedReferralId, setSelectedReferralId] = useState<Id<"referrals"> | null>(null);
 
   // Check if current user is already a provider
   const mySubscription = useQuery(api.bookingSubscribers.getMySubscription);
+  
+  const selectExpertFromReferral = useMutation(api.referrals.selectExpertFromReferral);
 
   const handleProviderSelect = (providerId: string) => {
     setSelectedProviderId(providerId as Id<"users">);
@@ -57,7 +63,8 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
         providerId: selectedProviderId,
         sessionDate: date,
         sessionTime: time,
-        duration: 60
+        duration: 60,
+        referralId: selectedReferralId || undefined,
       });
       setViewMode('payment');
     }
@@ -72,6 +79,17 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
     setSelectedEventId(eventId as Id<"events">);
     setViewMode('event-join');
   };
+  
+  const handleSelectExpertFromReferral = async (referralId: Id<"referrals">, expertId: Id<"users">) => {
+    try {
+      await selectExpertFromReferral({ referralId, selectedExpertId: expertId });
+      setSelectedReferralId(referralId);
+      setSelectedProviderId(expertId);
+      setViewMode('calendar');
+    } catch (error: any) {
+      alert(error.message || 'Failed to select expert');
+    }
+  };
 
   const handleBackToMain = () => {
     setViewMode('main');
@@ -79,6 +97,7 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
     setSelectedEventId(null);
     setBookingDetails(null);
     setCompletedBookingId(null);
+    setSelectedReferralId(null);
   };
 
   const handleSubscriptionComplete = () => {
@@ -92,6 +111,21 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
           <ProviderSubscriptionFlow
             onBack={handleBackToMain}
             onComplete={handleSubscriptionComplete}
+          />
+        );
+      
+      case 'my-referrals':
+        return (
+          <PatientReferralsList
+            onBack={handleBackToMain}
+            onSelectExpert={handleSelectExpertFromReferral}
+          />
+        );
+      
+      case 'expert-referrals':
+        return (
+          <ExpertReferralsList
+            onBack={handleBackToMain}
           />
         );
 
@@ -221,6 +255,14 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
                 <i className="fas fa-calendar-alt mr-2"></i>
                 My Bookings
               </button>
+              
+              <button
+                onClick={() => setViewMode('my-referrals')}
+                className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <i className="fas fa-user-md mr-2"></i>
+                My Referrals
+              </button>
 
               <button
                 onClick={() => setViewMode('subscribe')}
@@ -232,6 +274,14 @@ export function BookingScreen({ onBack }: BookingScreenProps) {
 
               {mySubscription && (
                 <>
+                  <button
+                    onClick={() => setViewMode('expert-referrals')}
+                    className="flex items-center px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                  >
+                    <i className="fas fa-handshake mr-2"></i>
+                    Referral Management
+                  </button>
+                
                   <button
                     onClick={() => setViewMode('my-events')}
                     className="flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
