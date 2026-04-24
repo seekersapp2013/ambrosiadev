@@ -36,13 +36,18 @@ export const createArticle = mutation({
       throw new Error("Article content must be a string");
     }
 
+    // Check if articles require approval
+    const settings = await ctx.db.query("moderationSettings").first();
+    const requiresApproval = settings?.articlesRequireApproval ?? true;
+
     // Log article creation for debugging
     console.log("Creating article:", {
       userId,
       title: args.title,
       contentHtmlLength: args.contentHtml.length,
       hasValidHTML: args.contentHtml.includes('<p>') || args.contentHtml.includes('<br>'),
-      contentPreview: args.contentHtml.substring(0, 100) + '...'
+      contentPreview: args.contentHtml.substring(0, 100) + '...',
+      requiresApproval
     });
 
     // Generate slug from title
@@ -55,6 +60,8 @@ export const createArticle = mutation({
     const wordCount = args.contentHtml.replace(/<[^>]*>/g, '').split(/\s+/).length;
     const readTimeMin = Math.max(1, Math.ceil(wordCount / 200));
 
+    const now = Date.now();
+
     const articleId = await ctx.db.insert("articles", {
       authorId: userId,
       title: args.title,
@@ -65,34 +72,50 @@ export const createArticle = mutation({
       coverImage: args.coverImage,
       readTimeMin,
       tags: args.tags,
-      status: "PUBLISHED",
-      publishedAt: Date.now(),
+      status: requiresApproval ? "DRAFT" : "PUBLISHED",
+      publishedAt: requiresApproval ? undefined : now,
       isSensitive: args.isSensitive,
-      isPublic: args.isPublic, // Add the new field
+      isPublic: args.isPublic,
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
       views: 0,
-      createdAt: Date.now(),
+      // Moderation fields
+      approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+      approvalRequestedAt: requiresApproval ? now : undefined,
+      createdAt: now,
     });
 
     console.log("Article created successfully:", articleId);
 
-    // Notify followers about new content
-    const followers = await ctx.db
-      .query("follows")
-      .withIndex("by_following", (q) => q.eq("followingId", userId))
-      .collect();
-
-    // Create notifications for all followers
-    for (const follow of followers) {
-      await ctx.runMutation(internal.notifications.createNotificationEvent, {
-        type: 'NEW_CONTENT',
-        recipientUserId: follow.followerId,
-        actorUserId: userId,
-        relatedContentType: 'article',
-        relatedContentId: articleId,
+    // If approval is required, create approval record
+    if (requiresApproval) {
+      await ctx.db.insert("contentApprovals", {
+        contentType: "articles",
+        contentId: articleId,
+        status: "PENDING",
+        submittedBy: userId,
+        createdAt: now,
       });
+      
+      console.log("Article submitted for approval");
+    } else {
+      // Only notify followers if article is published immediately
+      const followers = await ctx.db
+        .query("follows")
+        .withIndex("by_following", (q) => q.eq("followingId", userId))
+        .collect();
+
+      // Create notifications for all followers
+      for (const follow of followers) {
+        await ctx.runMutation(internal.notifications.createNotificationEvent, {
+          type: 'NEW_CONTENT',
+          recipientUserId: follow.followerId,
+          actorUserId: userId,
+          relatedContentType: 'article',
+          relatedContentId: articleId,
+        });
+      }
     }
 
     return articleId;
@@ -238,9 +261,16 @@ export const listFeed = query({
     const articles = await ctx.db
       .query("articles")
       .withIndex("by_status", (q) => q.eq("status", "PUBLISHED"))
-      .filter((q) => q.or(
-        q.eq(q.field("isPublic"), true),
-        q.eq(q.field("isPublic"), undefined)
+      .filter((q) => q.and(
+        q.or(
+          q.eq(q.field("isPublic"), true),
+          q.eq(q.field("isPublic"), undefined)
+        ),
+        // STRICT: Only show APPROVED or NOT_REQUIRED content
+        q.or(
+          q.eq(q.field("approvalStatus"), "APPROVED"),
+          q.eq(q.field("approvalStatus"), "NOT_REQUIRED")
+        )
       ))
       .order("desc")
       .take(limit);
@@ -483,5 +513,22 @@ export const listMyArticles = query({
     );
 
     return articlesWithAuthors;
+  },
+});
+
+// Get pending articles for current user
+export const getMyPendingArticles = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const articles = await ctx.db
+      .query("articles")
+      .withIndex("by_author", (q) => q.eq("authorId", userId))
+      .filter((q) => q.eq(q.field("approvalStatus"), "PENDING"))
+      .order("desc")
+      .collect();
+
+    return articles;
   },
 });

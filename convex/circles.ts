@@ -55,6 +55,10 @@ export const createCircle = mutation({
       throw new Error("Invalid posting permission");
     }
 
+    // Check if circles require approval
+    const settings = await ctx.db.query("moderationSettings").first();
+    const requiresApproval = settings?.circlesRequireApproval ?? true;
+
     const now = Date.now();
     const inviteCode = args.type === "PRIVATE" ? generateInviteCode() : undefined;
 
@@ -72,8 +76,11 @@ export const createCircle = mutation({
       maxMembers: args.maxMembers,
       currentMembers: 1, // Creator is the first member
       tags: args.tags || [],
-      isActive: true,
+      isActive: requiresApproval ? false : true, // Only active if approved or not required
       postingPermission,
+      // Moderation fields
+      approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+      approvalRequestedAt: requiresApproval ? now : undefined,
       createdAt: now,
     });
 
@@ -87,7 +94,18 @@ export const createCircle = mutation({
       isActive: true,
     });
 
-    return { circleId, inviteCode };
+    // If approval is required, create approval record
+    if (requiresApproval) {
+      await ctx.db.insert("contentApprovals", {
+        contentType: "circles",
+        contentId: circleId,
+        status: "PENDING",
+        submittedBy: userId,
+        createdAt: now,
+      });
+    }
+
+    return { circleId, inviteCode, requiresApproval };
   },
 });
 
@@ -163,6 +181,13 @@ export const getPublicCircles = query({
       .filter((q) => q.eq(q.field("isActive"), true));
 
     let allCircles = await query.collect();
+
+    // Filter by approval status - only show approved or not required
+    allCircles = allCircles.filter(circle => 
+      circle.approvalStatus === "APPROVED" || 
+      circle.approvalStatus === "NOT_REQUIRED" ||
+      circle.approvalStatus === undefined // For backward compatibility
+    );
 
     // Apply filters
     if (args.accessType) {
@@ -503,5 +528,21 @@ export const joinCircleByInviteCode = mutation({
     });
 
     return { circleId: circle._id, message: "Joined circle successfully" };
+  },
+});
+
+// Get pending circles for current user
+export const getMyPendingCircles = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const circles = await ctx.db
+      .query("circles")
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
+      .filter((q) => q.eq(q.field("approvalStatus"), "PENDING"))
+      .collect();
+
+    return circles;
   },
 });

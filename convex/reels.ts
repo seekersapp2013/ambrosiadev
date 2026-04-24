@@ -21,6 +21,12 @@ export const createReel = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
+    // Check if reels require approval
+    const settings = await ctx.db.query("moderationSettings").first();
+    const requiresApproval = settings?.reelsRequireApproval ?? true;
+
+    const now = Date.now();
+
     const reelId = await ctx.db.insert("reels", {
       authorId: userId,
       video: args.video,
@@ -29,29 +35,43 @@ export const createReel = mutation({
       caption: args.caption,
       tags: args.tags,
       isSensitive: args.isSensitive,
-      isPublic: args.isPublic, // Add the new field
+      isPublic: args.isPublic,
       isGated: args.isGated,
       priceToken: args.priceToken,
       priceAmount: args.priceAmount,
       views: 0,
-      createdAt: Date.now(),
+      // Moderation fields
+      approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+      approvalRequestedAt: requiresApproval ? now : undefined,
+      createdAt: now,
     });
 
-    // Notify followers about new content
-    const followers = await ctx.db
-      .query("follows")
-      .withIndex("by_following", (q) => q.eq("followingId", userId))
-      .collect();
-
-    // Create notifications for all followers
-    for (const follow of followers) {
-      await ctx.runMutation(internal.notifications.createNotificationEvent, {
-        type: 'NEW_CONTENT',
-        recipientUserId: follow.followerId,
-        actorUserId: userId,
-        relatedContentType: 'reel',
-        relatedContentId: reelId,
+    // If approval is required, create approval record
+    if (requiresApproval) {
+      await ctx.db.insert("contentApprovals", {
+        contentType: "reels",
+        contentId: reelId,
+        status: "PENDING",
+        submittedBy: userId,
+        createdAt: now,
       });
+    } else {
+      // Only notify followers if reel is published immediately
+      const followers = await ctx.db
+        .query("follows")
+        .withIndex("by_following", (q) => q.eq("followingId", userId))
+        .collect();
+
+      // Create notifications for all followers
+      for (const follow of followers) {
+        await ctx.runMutation(internal.notifications.createNotificationEvent, {
+          type: 'NEW_CONTENT',
+          recipientUserId: follow.followerId,
+          actorUserId: userId,
+          relatedContentType: 'reel',
+          relatedContentId: reelId,
+        });
+      }
     }
 
     return reelId;
@@ -120,9 +140,16 @@ export const listReels = query({
       .query("reels")
       .withIndex("by_created", (q) => q)
       .order("desc")
-      .filter((q) => q.or(
-        q.eq(q.field("isPublic"), true),
-        q.eq(q.field("isPublic"), undefined)
+      .filter((q) => q.and(
+        q.or(
+          q.eq(q.field("isPublic"), true),
+          q.eq(q.field("isPublic"), undefined)
+        ),
+        // STRICT: Only show APPROVED or NOT_REQUIRED content
+        q.or(
+          q.eq(q.field("approvalStatus"), "APPROVED"),
+          q.eq(q.field("approvalStatus"), "NOT_REQUIRED")
+        )
       ))
       .take(limit);
 
@@ -336,5 +363,22 @@ export const listMyReels = query({
     );
 
     return reelsWithAuthors;
+  },
+});
+
+// Get pending reels for current user
+export const getMyPendingReels = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const reels = await ctx.db
+      .query("reels")
+      .withIndex("by_author", (q) => q.eq("authorId", userId))
+      .filter((q) => q.eq(q.field("approvalStatus"), "PENDING"))
+      .order("desc")
+      .collect();
+
+    return reels;
   },
 });

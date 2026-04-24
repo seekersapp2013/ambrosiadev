@@ -46,6 +46,8 @@ import { NotificationManager } from "./components/NotificationManager";
 import { ChatScreen } from "./components/ChatScreen";
 import { PaymentCallback } from "./components/PaymentCallback";
 import { UserProfileView } from "./components/UserProfileView";
+import { ModerationSetup } from "./components/ModerationSetup";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
 
 // Main App Component
 function MainApp() {
@@ -65,8 +67,14 @@ function MainApp() {
   // Handle URL-based routing for callback
   useEffect(() => {
     const path = window.location.pathname;
+    const hash = window.location.hash.replace('#', '');
+    
     if (path === '/callback') {
       setCurrentScreen('payment-callback');
+    } else if (hash === 'moderation-setup') {
+      setCurrentScreen('moderation-setup');
+    } else if (hash === 'admin-dashboard') {
+      setCurrentScreen('admin-dashboard');
     }
   }, []);
 
@@ -182,6 +190,10 @@ function MainApp() {
         return <EmailHistory />;
       case 'payment-callback':
         return <PaymentCallback />;
+      case 'moderation-setup':
+        return <ModerationSetup />;
+      case 'admin-dashboard':
+        return <AdminDashboard />;
 
       default:
         return <StreamScreen onNavigate={showScreen} />;

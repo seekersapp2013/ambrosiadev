@@ -133,6 +133,13 @@ export default defineSchema({
     priceAmount: v.optional(v.number()),
     sellerAddress: v.optional(v.string()), // TEMPORARY: Remove after migration
     views: v.number(),
+    // Moderation fields
+    approvalStatus: v.optional(v.string()), // "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED"
+    approvalRequestedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedByRole: v.optional(v.id("moderationRoles")),
+    approvedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_slug", ["slug"])
@@ -141,7 +148,8 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"])
     .index("by_public", ["isPublic"])
-    .index("by_public_status", ["isPublic", "status"]),
+    .index("by_public_status", ["isPublic", "status"])
+    .index("by_approval_status", ["approvalStatus"]),
 
   // ✅ Reels table
   reels: defineTable({
@@ -159,10 +167,18 @@ export default defineSchema({
     priceAmount: v.optional(v.number()),
     sellerAddress: v.optional(v.string()), // TEMPORARY: Remove after migration
     views: v.number(),
+    // Moderation fields
+    approvalStatus: v.optional(v.string()), // "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED"
+    approvalRequestedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedByRole: v.optional(v.id("moderationRoles")),
+    approvedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
     createdAt: v.number()
   }).index("by_author", ["authorId"])
     .index("by_created", ["createdAt"])
-    .index("by_public", ["isPublic"]),
+    .index("by_public", ["isPublic"])
+    .index("by_approval_status", ["approvalStatus"]),
 
   // ✅ Comments table
   comments: defineTable({
@@ -467,12 +483,20 @@ export default defineSchema({
       sunday: v.object({ start: v.string(), end: v.string(), available: v.boolean() })
     }),
     isActive: v.boolean(),
+    // Moderation fields
+    approvalStatus: v.optional(v.string()), // "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED"
+    approvalRequestedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedByRole: v.optional(v.id("moderationRoles")),
+    approvedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_user", ["userId"])
     .index("by_specialization", ["specialization"])
     .index("by_job_title", ["jobTitle"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_approval_status", ["approvalStatus"]),
 
   // ✅ Bookings table
   bookings: defineTable({
@@ -689,6 +713,13 @@ export default defineSchema({
     isActive: v.boolean(),
     // Admin-only posting feature (like WhatsApp admin-only groups)
     postingPermission: v.string(), // "EVERYONE" | "ADMINS_ONLY"
+    // Moderation fields
+    approvalStatus: v.optional(v.string()), // "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED"
+    approvalRequestedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedByRole: v.optional(v.id("moderationRoles")),
+    approvedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_creator", ["creatorId"])
@@ -697,7 +728,8 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_invite_code", ["inviteCode"])
     .index("by_posting_permission", ["postingPermission"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_approval_status", ["approvalStatus"]),
 
   // ✅ Circle Members table
   circleMembers: defineTable({
@@ -796,13 +828,21 @@ export default defineSchema({
     escrowTxId: v.optional(v.string()), // Transaction ID for escrowed funds
     completedAt: v.optional(v.number()),
     tags: v.optional(v.array(v.string())),
+    // Moderation fields
+    approvalStatus: v.optional(v.string()), // "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED"
+    approvalRequestedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedByRole: v.optional(v.id("moderationRoles")),
+    approvedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_circle", ["circleId"])
     .index("by_requester", ["requesterId"])
     .index("by_status", ["status"])
     .index("by_expert", ["selectedExpertId"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_approval_status", ["approvalStatus"]),
 
   // ✅ Expert Applications table
   expertApplications: defineTable({
@@ -880,5 +920,103 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_booking", ["bookingId"])
     .index("by_patient_status", ["patientId", "status"])
+    .index("by_created", ["createdAt"]),
+
+  // ✅ MODERATION SYSTEM TABLES
+
+  // Moderation Roles - Define custom roles with permissions
+  moderationRoles: defineTable({
+    name: v.string(),
+    description: v.string(),
+    permissions: v.array(v.string()), // Array of permission strings
+    canApprove: v.array(v.string()), // Array of content types this role can approve
+    isSystemRole: v.boolean(), // True for "Primary Admin" role (cannot be deleted/edited)
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_name", ["name"])
     .index("by_created", ["createdAt"])
+    .index("by_system_role", ["isSystemRole"]),
+
+  // Moderation Assignments - Assign roles to users
+  moderationAssignments: defineTable({
+    userId: v.id("users"),
+    roleId: v.id("moderationRoles"),
+    assignedBy: v.id("users"),
+    assignedAt: v.number(),
+    isActive: v.boolean(),
+    isPrimaryAdmin: v.boolean(), // Only one user can have this true (the first user)
+    expiresAt: v.optional(v.number()) // Optional expiration for temporary assignments
+  }).index("by_user", ["userId"])
+    .index("by_role", ["roleId"])
+    .index("by_active", ["isActive"])
+    .index("by_primary_admin", ["isPrimaryAdmin"])
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_assigned_by", ["assignedBy"]),
+
+  // Moderation Settings - Global moderation configuration (singleton)
+  moderationSettings: defineTable({
+    articlesRequireApproval: v.boolean(),
+    reelsRequireApproval: v.boolean(),
+    circlesRequireApproval: v.boolean(),
+    expertRequestsRequireApproval: v.boolean(),
+    bookingSubscribersRequireApproval: v.boolean(),
+    primaryAdminUserId: v.id("users"), // The first user
+    updatedBy: v.id("users"),
+    updatedAt: v.number(),
+    createdAt: v.number()
+  }),
+
+  // Content Approvals - Track approval status for content
+  contentApprovals: defineTable({
+    contentType: v.string(), // "article" | "reel" | "circle" | "expertRequest" | "bookingSubscriber"
+    contentId: v.string(), // ID of the content
+    status: v.string(), // "PENDING" | "APPROVED" | "REJECTED"
+    submittedBy: v.id("users"),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    approverRole: v.optional(v.id("moderationRoles")), // Which role was used to approve
+    rejectionReason: v.optional(v.string()),
+    createdAt: v.number()
+  }).index("by_content", ["contentType", "contentId"])
+    .index("by_status", ["status"])
+    .index("by_submitter", ["submittedBy"])
+    .index("by_reviewer", ["reviewedBy"])
+    .index("by_content_type", ["contentType"])
+    .index("by_content_type_status", ["contentType", "status"]),
+
+  // Moderation Actions - Audit log for all moderation actions
+  moderationActions: defineTable({
+    actionType: v.string(), // "APPROVE" | "REJECT" | "DELETE" | "BAN" | "UNBAN" | "ASSIGN_ROLE" | "REMOVE_ROLE" | "UPDATE_SETTINGS" | "CREATE_ROLE" | "DELETE_ROLE"
+    performedBy: v.id("users"),
+    performerRole: v.optional(v.id("moderationRoles")), // Which role was used for the action
+    targetUserId: v.optional(v.id("users")),
+    targetContentType: v.optional(v.string()),
+    targetContentId: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    metadata: v.optional(v.any()), // Additional context
+    createdAt: v.number()
+  }).index("by_performer", ["performedBy"])
+    .index("by_target_user", ["targetUserId"])
+    .index("by_action_type", ["actionType"])
+    .index("by_created", ["createdAt"])
+    .index("by_performer_role", ["performerRole"]),
+
+  // User Bans - Track banned users
+  userBans: defineTable({
+    userId: v.id("users"),
+    bannedBy: v.id("users"),
+    bannedByRole: v.optional(v.id("moderationRoles")),
+    reason: v.string(),
+    banType: v.string(), // "TEMPORARY" | "PERMANENT"
+    expiresAt: v.optional(v.number()), // For temporary bans
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    unbannedBy: v.optional(v.id("users")),
+    unbannedAt: v.optional(v.number())
+  }).index("by_user", ["userId"])
+    .index("by_active", ["isActive"])
+    .index("by_expires", ["expiresAt"])
+    .index("by_banned_by", ["bannedBy"])
+    .index("by_user_active", ["userId", "isActive"])
 });

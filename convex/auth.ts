@@ -84,6 +84,22 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             walletId,
             username: finalUsername 
           });
+
+          // Check if this is the first user and initialize moderation system
+          const allUsers = await ctx.db.query("users").collect();
+          if (allUsers.length === 1) {
+            console.log('First user detected, initializing moderation system...');
+            
+            // Import the helper function
+            const { ensurePrimaryAdminExists } = await import("./moderationHelpers");
+            const success = await ensurePrimaryAdminExists(ctx);
+            
+            if (success) {
+              console.log('Moderation system initialized successfully for first user');
+            } else {
+              console.error('Failed to initialize moderation system');
+            }
+          }
         } catch (error) {
           console.error('Error creating profile and wallet for new user:', error);
         }

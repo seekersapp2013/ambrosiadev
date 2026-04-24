@@ -5,12 +5,13 @@ import { NotificationBanner } from "./NotificationBanner";
 import { ForYouTab } from "./ForYouTab";
 import { LearnScreen } from "./LearnScreen";
 import { CommunityTab } from "./CommunityTab";
+import { NovaAIChat } from "./NovaAIChat";
 
 interface StreamScreenProps {
   onNavigate?: (screen: string, data?: any) => void;
 }
 
-type TabType = 'for-you' | 'learn' | 'community';
+type TabType = 'for-you' | 'learn' | 'community' | 'ai-chat';
 
 export function StreamScreen({ onNavigate }: StreamScreenProps = {}) {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -139,6 +140,16 @@ export function StreamScreen({ onNavigate }: StreamScreenProps = {}) {
           >
             Community
           </button>
+          <button
+            onClick={() => setActiveTab('ai-chat')}
+            className={`flex-1 py-4 px-4 text-center font-medium transition-colors ${
+              activeTab === 'ai-chat'
+                ? 'text-accent border-b-2 border-accent bg-accent/5'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            AI Chat
+          </button>
         </div>
       </div>
 
@@ -146,6 +157,7 @@ export function StreamScreen({ onNavigate }: StreamScreenProps = {}) {
       {activeTab === 'for-you' && <ForYouTab content={content} onNavigate={onNavigate} />}
       {activeTab === 'learn' && <LearnScreen onNavigate={onNavigate} />}
       {activeTab === 'community' && <CommunityTab onNavigate={onNavigate} />}
+      {activeTab === 'ai-chat' && <NovaAIChat onNavigate={onNavigate} />}
     </div>
   );
 }

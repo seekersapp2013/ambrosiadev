@@ -32,6 +32,12 @@ export const createExpertRequest = mutation({
       throw new Error("Only circle creators or admins can create expert requests");
     }
 
+    // Check if expert requests require approval
+    const settings = await ctx.db.query("moderationSettings").first();
+    const requiresApproval = settings?.expertRequestsRequireApproval ?? false;
+
+    const now = Date.now();
+
     const requestId = await ctx.db.insert("expertRequests", {
       circleId: args.circleId,
       requesterId: userId,
@@ -40,12 +46,25 @@ export const createExpertRequest = mutation({
       agreedAmount: args.agreedAmount,
       agreedCurrency: args.agreedCurrency,
       duration: args.duration,
-      status: "OPEN",
+      status: requiresApproval ? "PENDING" : "OPEN",
       tags: args.tags || [],
-      createdAt: Date.now(),
+      approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+      approvalRequestedAt: requiresApproval ? now : undefined,
+      createdAt: now,
     });
 
-    return { requestId };
+    // If approval is required, create approval record
+    if (requiresApproval) {
+      await ctx.db.insert("contentApprovals", {
+        contentType: "expertRequests",
+        contentId: requestId,
+        status: "PENDING",
+        submittedBy: userId,
+        createdAt: now,
+      });
+    }
+
+    return { requestId, requiresApproval };
   },
 });
 

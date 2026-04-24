@@ -58,6 +58,10 @@ export const createSubscriber = mutation({
       throw new Error("All required fields must be filled");
     }
 
+    // Check if booking subscribers require approval
+    const settings = await ctx.db.query("moderationSettings").first();
+    const requiresApproval = settings?.bookingSubscribersRequireApproval ?? false;
+
     const now = Date.now();
 
     const subscriberId = await ctx.db.insert("bookingSubscribers", {
@@ -72,9 +76,22 @@ export const createSubscriber = mutation({
       linkedInLink: args.linkedInLink?.trim() || undefined,
       offerDescription: args.offerDescription.trim(),
       openHours: args.openHours,
-      isActive: true,
+      isActive: !requiresApproval, // Only active if no approval required
+      approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+      approvalRequestedAt: requiresApproval ? now : undefined,
       createdAt: now
     });
+
+    // If approval is required, create approval record
+    if (requiresApproval) {
+      await ctx.db.insert("contentApprovals", {
+        contentType: "bookingSubscribers",
+        contentId: subscriberId,
+        status: "PENDING",
+        submittedBy: userId,
+        createdAt: now,
+      });
+    }
 
     // Create default booking settings
     await ctx.db.insert("bookingSettings", {
@@ -86,7 +103,7 @@ export const createSubscriber = mutation({
       createdAt: now
     });
 
-    return subscriberId;
+    return { subscriberId, requiresApproval };
   }
 });
 

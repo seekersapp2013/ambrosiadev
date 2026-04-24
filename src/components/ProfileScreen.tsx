@@ -85,6 +85,9 @@ export function ProfileScreen() {
   const myArticles = useQuery(api.profiles.getMyArticles);
   const myFollowers = useQuery(api.profiles.getMyFollowers);
   const myFollowing = useQuery(api.profiles.getMyFollowing);
+  const myRoles = useQuery(api.moderation.getMyRoles);
+  const isModerator = useQuery(api.moderation.amIModerator);
+  const needsSetup = useQuery(api.moderationQueries.needsModerationSetup);
   const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'followers' | 'following' | 'interests'>('posts');
   const [isUploading, setIsUploading] = useState(false);
   const [showInterestManagement, setShowInterestManagement] = useState(false);
@@ -305,7 +308,25 @@ export function ProfileScreen() {
         <div className="mb-6">
           <h2 className="font-bold">{myProfile?.name || myProfile?.username || 'My Profile'}</h2>
           {myProfile?.username && (
-            <p className="text-sm text-gray-600 mb-2">@{myProfile.username}</p>
+            <div className="flex items-center space-x-2 mb-2">
+              <p className="text-sm text-gray-600">@{myProfile.username}</p>
+              {/* Role Badge */}
+              {myRoles && myRoles.length > 0 ? (
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  myRoles.some((r: any) => r.isPrimaryAdmin) 
+                    ? 'bg-purple-600 text-white' 
+                    : myRoles.some((r: any) => r.name === 'Admin')
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-green-600 text-white'
+                }`}>
+                  {myRoles.find((r: any) => r.isPrimaryAdmin)?.name || myRoles[0]?.name}
+                </span>
+              ) : (
+                <span className="text-xs bg-gray-400 text-white px-2 py-1 rounded-full">
+                  User
+                </span>
+              )}
+            </div>
           )}
           {myProfile?.bio && <p className="text-sm mb-2">{myProfile.bio}</p>}
 
@@ -588,6 +609,40 @@ export function ProfileScreen() {
         <div className="mt-8 pt-6 border-t border-gray-200">
           <h3 className="text-lg font-semibold mb-4">Settings</h3>
           <div className="space-y-3">
+            {/* Moderation Setup Button - Only show for first user if system needs setup */}
+            {needsSetup && (
+              <button
+                onClick={() => {
+                  window.location.hash = 'moderation-setup';
+                  window.location.reload();
+                }}
+                className="w-full flex items-center justify-between p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors text-yellow-700"
+              >
+                <div className="flex items-center">
+                  <i className="fas fa-tools mr-3"></i>
+                  <span className="font-medium">Setup Moderation System</span>
+                </div>
+                <i className="fas fa-chevron-right text-yellow-400"></i>
+              </button>
+            )}
+
+            {/* Admin Dashboard Button - Only show for moderators */}
+            {isModerator && (
+              <button
+                onClick={() => {
+                  window.location.hash = 'admin-dashboard';
+                  window.location.reload();
+                }}
+                className="w-full flex items-center justify-between p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-purple-600"
+              >
+                <div className="flex items-center">
+                  <i className="fas fa-shield-alt mr-3"></i>
+                  <span className="font-medium">Admin Dashboard</span>
+                </div>
+                <i className="fas fa-chevron-right text-purple-400"></i>
+              </button>
+            )}
+
             {/* Install App Button */}
             {showInstallButton && (
               <button

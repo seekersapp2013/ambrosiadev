@@ -834,6 +834,7 @@ export const deleteCourse = mutation({
 });
 
 // Get all course-related content (articles and reels that belong to courses)
+// In "all" mode, shows ALL approved content (not just course content)
 export const getCourseRelatedContent = query({
   args: {
     limit: v.optional(v.number()),
@@ -844,6 +845,94 @@ export const getCourseRelatedContent = query({
     if (!userId) return { articles: [], reels: [] };
 
     const limit = args.limit || 50;
+
+    // For "all" mode, show ALL approved content (not just course content)
+    if (args.viewMode === 'all' || !args.viewMode) {
+      // Get all published articles with STRICT approval filtering
+      const allArticles = await ctx.db
+        .query("articles")
+        .withIndex("by_status", (q) => q.eq("status", "PUBLISHED"))
+        .filter((q) => q.and(
+          q.or(
+            q.eq(q.field("isPublic"), true),
+            q.eq(q.field("isPublic"), undefined)
+          ),
+          // STRICT: Only show APPROVED or NOT_REQUIRED content, or content without approval status (legacy)
+          q.or(
+            q.eq(q.field("approvalStatus"), "APPROVED"),
+            q.eq(q.field("approvalStatus"), "NOT_REQUIRED"),
+            q.eq(q.field("approvalStatus"), undefined)
+          )
+        ))
+        .order("desc")
+        .take(limit);
+
+      // Get all reels with STRICT approval filtering
+      const allReels = await ctx.db
+        .query("reels")
+        .withIndex("by_created", (q) => q)
+        .order("desc")
+        .filter((q) => q.and(
+          q.or(
+            q.eq(q.field("isPublic"), true),
+            q.eq(q.field("isPublic"), undefined)
+          ),
+          // STRICT: Only show APPROVED or NOT_REQUIRED content, or content without approval status (legacy)
+          q.or(
+            q.eq(q.field("approvalStatus"), "APPROVED"),
+            q.eq(q.field("approvalStatus"), "NOT_REQUIRED"),
+            q.eq(q.field("approvalStatus"), undefined)
+          )
+        ))
+        .take(limit);
+
+      // Get author info for articles
+      const articlesWithAuthors = await Promise.all(
+        allArticles.map(async (article) => {
+          const authorProfile = await ctx.db
+            .query("profiles")
+            .withIndex("by_userId", (q) => q.eq("userId", article.authorId))
+            .first();
+
+          return {
+            ...article,
+            author: {
+              id: article.authorId,
+              name: authorProfile?.name,
+              username: authorProfile?.username,
+              avatar: authorProfile?.avatar,
+            },
+          };
+        })
+      );
+
+      // Get author info for reels
+      const reelsWithAuthors = await Promise.all(
+        allReels.map(async (reel) => {
+          const authorProfile = await ctx.db
+            .query("profiles")
+            .withIndex("by_userId", (q) => q.eq("userId", reel.authorId))
+            .first();
+
+          return {
+            ...reel,
+            author: {
+              id: reel.authorId,
+              name: authorProfile?.name,
+              username: authorProfile?.username,
+              avatar: authorProfile?.avatar,
+            },
+          };
+        })
+      );
+
+      return {
+        articles: articlesWithAuthors,
+        reels: reelsWithAuthors,
+      };
+    }
+
+    // For "my-courses" and "enrolled" modes, show only course content
     let courseIds: string[] = [];
 
     // Get relevant course IDs based on view mode
@@ -861,13 +950,6 @@ export const getCourseRelatedContent = query({
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
       courseIds = enrollments.map(enrollment => enrollment.courseId);
-    } else {
-      // Get all published courses for "all" mode
-      const allCourses = await ctx.db
-        .query("courses")
-        .filter((q) => q.eq(q.field("isPublished"), true))
-        .collect();
-      courseIds = allCourses.map(course => course._id);
     }
 
     if (courseIds.length === 0) {
@@ -892,11 +974,22 @@ export const getCourseRelatedContent = query({
       .filter(content => content.contentType === 'reel')
       .map(content => content.contentId);
 
-    // Fetch articles and reels
+    // Fetch articles and reels with STRICT approval filtering
     const articles = await Promise.all(
       articleIds.slice(0, limit).map(async (id) => {
         const article = await ctx.db.get(id as any);
         if (!article || !('authorId' in article)) return null;
+
+        // STRICT: Only show APPROVED, NOT_REQUIRED, or legacy content (undefined approval status)
+        const approvalStatus = (article as any).approvalStatus;
+        if (approvalStatus !== "APPROVED" && approvalStatus !== "NOT_REQUIRED" && approvalStatus !== undefined) {
+          return null;
+        }
+
+        // Only show PUBLISHED articles
+        if ((article as any).status !== "PUBLISHED") {
+          return null;
+        }
 
         // Get author profile info
         const authorProfile = await ctx.db
@@ -920,6 +1013,12 @@ export const getCourseRelatedContent = query({
       reelIds.slice(0, limit).map(async (id) => {
         const reel = await ctx.db.get(id as any);
         if (!reel || !('authorId' in reel)) return null;
+
+        // STRICT: Only show APPROVED, NOT_REQUIRED, or legacy content (undefined approval status)
+        const approvalStatus = (reel as any).approvalStatus;
+        if (approvalStatus !== "APPROVED" && approvalStatus !== "NOT_REQUIRED" && approvalStatus !== undefined) {
+          return null;
+        }
 
         // Get author profile info
         const authorProfile = await ctx.db
